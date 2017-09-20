@@ -1,4 +1,4 @@
-from models import model1
+from models import factors
 
 if __name__ == "__main__":
-    model1.run()
+    factors.run()
