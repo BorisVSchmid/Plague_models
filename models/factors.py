@@ -21,10 +21,10 @@ def run():
     sus_frac = .08
     s_r[0] = s_h * sus_frac
     beta_r = .08
-    i_r[0] = 12.
+    i_r[0] = 15.
     gamma_r = 0.2
     por_r = .1
-    rep_rate = 5
+    rep_rate = .2
     inh_res = 0.975
     # - flea
     d_rate = 0.2
@@ -38,9 +38,9 @@ def run():
     # -- Simulate
     for i in t[1:]:
         N_r = s_r[i - 1] + i_r[i - 1] + rec_r[i - 1]
+        # Fleas
         if i == 1:
             infected_rat_deaths = d_h[0]
-            # Fleas
             c_cap = fph[0]  # avg number of fleas per rat at carrying capacity
         if fph[i - 1] / c_cap < 1.:
             flea_growth = g_rate * (fph[i - 1] * (1. - (fph[i - 1] / c_cap)))
@@ -48,6 +48,7 @@ def run():
             flea_growth = -g_rate * (fph[i - 1] * (1. - (fph[i - 1] / c_cap)))
         else:
             flea_growth = 0.
+
         new_infectious = infected_rat_deaths * fph[i - 1]
         starvation_deaths = d_rate * i_f[i - 1]
         force_to_humans = min(i_f[i - 1], i_f[i - 1] * np.exp(-searching * N_r))  # number of fleas that find a human
@@ -60,8 +61,8 @@ def run():
         new_recovered_rats = por_r * new_removed_rats
         new_dead_rats = new_removed_rats - new_recovered_rats
         infected_rat_deaths = new_dead_rats
-        born_rats = (rep_rate * s_r[i - 1] * (1 - (N_r/c_cap))) + (rep_rate * rec_r[i - 1] * (1 - inh_res))
-        s_r[i] = s_r[i - 1] - new_infected_rats - (s_r[i - 1] * d_rate) + born_rats
+        born_rats = (rep_rate * s_r[i - 1] * (1. - (N_r/c_cap))) + (rep_rate * rec_r[i - 1] * (1. - inh_res))
+        s_r[i] = (rep_rate * s_r[i - 1]) - new_infected_rats - (s_r[i - 1] * d_rate) + born_rats
         i_r[i] = i_r[i - 1] + new_infected_rats - new_removed_rats
         rec_r[i] = rec_r[i - 1] + new_recovered_rats + (rep_rate * rec_r[i - 1] * (inh_res - (N_r/c_cap))) - (d_rate * rec_r[i - 1])
         d_r[i] = new_dead_rats
