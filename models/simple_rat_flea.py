@@ -43,8 +43,8 @@ def run():
     i_r[0] = 15.
     gamma_r = 0.2
     por_r = .1
-    rep_rate_r = .5
-    rep_rate_ur = .4
+    rep_rate_r = .4
+    rep_rate_ur = .4 * (1 - 0.234)
     inh_res = 0.975
 
     # - flea
