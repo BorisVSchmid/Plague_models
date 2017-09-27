@@ -1,74 +1,127 @@
 import numpy as np
 import scipy as sp
 import pymc3 as pm
+import pandas as pd
+from datetime import date
+import matplotlib.dates as mdates
 
 def run():
     with pm.Model() as plague_model:
+        years = mdates.YearLocator()  # every year
+        months = mdates.MonthLocator()  # every month
+        yearsFmt = mdates.DateFormatter('%Y')
+        years_list = pd.date_range(date(1990, 1, 1), date(2000, 12, 31)).tolist()
+
         # -- Params
-        t = range(1, 3651, 1)
+        temp = [[31.1, 27.1, 23.6, 82], [30.8, 27.2, 23.8, 83], [32.5, 27.5, 23.6, 81], [32.5, 27.4, 22.9, 73],
+                [32.0, 26.1, 20.6, 67], [31.0, 24.6, 18.6, 64], [30.8, 24.2, 18.0, 62], [31.4, 24.6, 18.4, 60],
+                [32.1, 25.4, 19.6, 63], [32.5, 26.8, 22.0, 66], [32.2, 27.7, 23.5, 72], [31.3, 27.4, 23.7, 80]]
+        decade = {}
+        for time in years_list:
+            time = time.strftime("%Y-%m-%d")
+            time_s = time.split("-")
+            decade[time] = temp[int(time_s[1]) - 1]
+        t = [x for x in range(0, len(decade))]
         # - Human
-        beta_h = pm.Uniform(1e-9, .2, value=.2)
-        s_h = 100000.
-        i_h = np.zeros(t, dtype=object)
-        r_h = np.zeros(t, dtype=object)
-        d_h = np.zeros(t, dtype=object)
-        gamma_h = .1
-        por_h = .4
+        beta_h = pm.Uniform(lower=1e-9, upper=.2, name="beta_h")
+        i_h = np.zeros_like(t, dtype=object)
+        r_h = np.zeros_like(t, dtype=object)
+        d_h = np.zeros_like(t, dtype=object)
+        s_h = 25000.
+        gamma_h = 0.1
+        p_recovery_h = .4
+
         # - rat
-        s_r = np.zeros(t, dtype=object)
-        i_r = np.zeros(t, dtype=object)
-        res_r = np.zeros(t, dtype=object)
-        rec_r = np.zeros(t, dtype=object)
-        d_r = np.zeros(t, dtype=object)
-        sus_frac = pm.Uniform(1e-9, 1., value=.08)
+        s_r = np.zeros_like(t, dtype=object)
+        i_r = np.zeros_like(t, dtype=object)
+        res_r = np.zeros_like(t, dtype=object)
+        d_r = np.zeros_like(t, dtype=object)
+        sus_frac = pm.Uniform(lower=1e-9, upper=1., name="sus_frac")
+        beta_r = pm.Uniform(lower=1e-9, upper=1.0, name="beta_r")
+        i_r[0] = pm.Uniform(lower=0.15, upper=15., name="i_r")
+        # 0.08
         s_r[0] = s_h * sus_frac
-        beta_r = pm.Uniform(1e-9, 1.0, value=.08)
-        i_r[0] = pm.Uniform(0.15, 1.)
-        gamma_r = 1/5.2
-        por_r = .1
+        # rec_r[0] = s_h * sus_frac
+        i_r[0] = 15.
+        gamma_r = 0.2
+        # .1 \/
+        p_recovery_ur = .058
+        rep_rate_r = .4 * (1 - 0.234)
+        rep_rate_ur = .4
+        inh_res = 0.975
+        d_rate_ui = 1 / (365 * 1)
+
         # - flea
-        d_rate = .2
+
+        i_f = np.zeros_like(t, dtype=object)
+        fph = np.zeros_like(t, dtype=object)
+        d_rate = 0.2
+        # 0.2
         g_rate = .0084
         c_cap = 6.
-        i_f = np.zeros(t, dtype=object)
-        fph = np.zeros(t, dtype=object)
         fph[0] = c_cap
-        searching = 3. / s_r[0]
+        searching = 3. / (s_r[0] + res_r[0])
+
         # -- Simulate
-        for i in t:
-            N_r = s_r[i - 1] + i_r[i - 1] + rec_r[i - 1]
+        for i in t[1:]:
+            # + rec_r[i - 1]
+            N_r = s_r[i - 1] + i_r[i - 1] + res_r[i - 1]
+            # - Fleas
             if i == 1:
                 infected_rat_deaths = d_h[0]
-                # Fleas
-                c_cap = fph[0]  # avg number of fleas per rat at carrying capacity
+                # avg number of fleas per rat at carrying capacity
+                c_cap = fph[0]
             if fph[i - 1] / c_cap < 1.:
                 flea_growth = g_rate * (fph[i - 1] * (1. - (fph[i - 1] / c_cap)))
             elif fph[i - 1] / c_cap > 1.:
                 flea_growth = -g_rate * (fph[i - 1] * (1. - (fph[i - 1] / c_cap)))
             else:
                 flea_growth = 0.
-            new_infectious = infected_rat_deaths * (fph[i - 1])
+
+            new_infectious = infected_rat_deaths * fph[i - 1]
             starvation_deaths = d_rate * i_f[i - 1]
-            force_to_humans = min(i_f[i - 1], i_f[i - 1] * np.exp(-searching * N_r))  # number of fleas that find a human
-            force_to_rats = i_f[i - 1] - force_to_humans  # number of fleas that find a rat
+            # number of fleas that find a human
+            force_to_humans = min(i_f[i - 1], i_f[i - 1] * np.exp(-searching * N_r))
+            # number of fleas that find a rat
+            force_to_rats = i_f[i - 1] - force_to_humans
             fph[i] = fph[i - 1] + flea_growth
             i_f[i] = i_f[i - 1] + new_infectious - starvation_deaths
-            # Rats
+
+            # - Rats
             new_infected_rats = min(s_r[i - 1], beta_r * s_r[i - 1] * force_to_rats / N_r)
             new_removed_rats = gamma_r * i_r[i - 1]
-            new_recovered_rats = por_r * new_removed_rats
+            new_recovered_rats = p_recovery_ur * new_removed_rats
             new_dead_rats = new_removed_rats - new_recovered_rats
             infected_rat_deaths = new_dead_rats
-            s_r[i] = s_r[i - 1] - new_infected_rats
+
+            # born rats
+            resistant_born_rats = (rep_rate_r * res_r[i - 1] * (inh_res - (N_r / (s_h * sus_frac))))
+            resistant_born_rats = 0 if N_r / (s_h * sus_frac) < 0 else resistant_born_rats
+            unresistant_from_resistant = (rep_rate_ur * res_r[i - 1] * (1. - inh_res))
+            unresistant_born_rats = (rep_rate_ur * (res_r[i - 1] + s_r[i - 1]) * (1. - (N_r / (s_h * sus_frac))))
+            unresistant_born_rats = 0 if N_r / (s_h * sus_frac) < 0 else unresistant_born_rats
+            born_rats = unresistant_born_rats + unresistant_from_resistant
+
+            # natural deaths
+            natural_death_unresistant = (s_r[i - 1] * d_rate_ui)
+            natural_death_resistant = (res_r[i - 1] * d_rate_ui)
+            # rec
+
+            # time step values
+            s_r[i] = s_r[i - 1] + born_rats - new_infected_rats - natural_death_unresistant
             i_r[i] = i_r[i - 1] + new_infected_rats - new_removed_rats
-            rec_r[i] = rec_r[i - 1] + new_recovered_rats
-            d_r[i] = new_dead_rats
-            # Humans
+            # rec_r[i] = rec_r[i - 1] + new_recovered_rats - natural_death_recovered
+            res_r[i] = res_r[i - 1] + new_recovered_rats + resistant_born_rats - natural_death_resistant
+            d_r[i] = new_dead_rats + natural_death_unresistant + natural_death_resistant
+
+            # - Humans
             N_h = s_h + i_h[i - 1] + r_h[i - 1]
             new_infected_humans = min(s_h, beta_h * s_h * force_to_humans / N_h)
             new_removed_humans = gamma_h * i_h[i - 1]
-            new_recovered_humans = por_h * new_removed_humans
+            new_recovered_humans = p_recovery_h * new_removed_humans
             new_dead_humans = new_removed_humans - new_recovered_humans
+
+            # time step values
             i_h[i] = i_h[i - 1] + new_infected_humans - new_removed_humans
             r_h[i] = r_h[i - 1] + new_recovered_humans
             d_h[i] = new_dead_humans

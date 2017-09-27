@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 
-def run():
+def run(title):
     years = mdates.YearLocator()  # every year
     months = mdates.MonthLocator()  # every month
     yearsFmt = mdates.DateFormatter('%Y')
@@ -29,23 +29,27 @@ def run():
     r_h = np.zeros_like(t)
     d_h = np.zeros_like(t)
     gamma_h = 0.1
-    por_h = .4
+    p_recovery_h = .4
 
     # - rat
     s_r = np.zeros_like(t)
     i_r = np.zeros_like(t)
-    rec_r = np.zeros_like(t)
+    # rec_r = np.zeros_like(t)
+    res_r = np.zeros_like(t)
     d_r = np.zeros_like(t)
-    sus_frac = .1
+    sus_frac = 0.1
     # 0.08
     s_r[0] = s_h * sus_frac
+    # rec_r[0] = s_h * sus_frac
     beta_r = .08
     i_r[0] = 15.
     gamma_r = 0.2
-    por_r = .1
-    rep_rate_r = .4
-    rep_rate_ur = .4 * (1 - 0.234)
+    # .1 \/
+    p_recovery_ur = .058
+    rep_rate_r = .4 * (1 - 0.234)
+    rep_rate_ur = .4
     inh_res = 0.975
+    d_rate_ui = 1/(365 * 1)
 
     # - flea
     d_rate = 0.2
@@ -55,15 +59,17 @@ def run():
     i_f = np.zeros_like(t)
     fph = np.zeros_like(t)
     fph[0] = c_cap
-    searching = 3. / s_r[0]
+    searching = 3. / (s_r[0] + res_r[0])
 
     # -- Simulate
     for i in t[1:]:
-        N_r = s_r[i - 1] + i_r[i - 1] + rec_r[i - 1]
+        # + rec_r[i - 1]
+        N_r = s_r[i - 1] + i_r[i - 1] + res_r[i - 1]
         # - Fleas
         if i == 1:
             infected_rat_deaths = d_h[0]
-            c_cap = fph[0]  # avg number of fleas per rat at carrying capacity
+            # avg number of fleas per rat at carrying capacity
+            c_cap = fph[0]
         if fph[i - 1] / c_cap < 1.:
             flea_growth = g_rate * (fph[i - 1] * (1. - (fph[i - 1] / c_cap)))
         elif fph[i - 1] / c_cap > 1.:
@@ -73,41 +79,45 @@ def run():
 
         new_infectious = infected_rat_deaths * fph[i - 1]
         starvation_deaths = d_rate * i_f[i - 1]
-        force_to_humans = min(i_f[i - 1], i_f[i - 1] * np.exp(-searching * N_r))  # number of fleas that find a human
-        force_to_rats = i_f[i - 1] - force_to_humans  # number of fleas that find a rat
+        # number of fleas that find a human
+        force_to_humans = min(i_f[i - 1], i_f[i - 1] * np.exp(-searching * N_r))
+        # number of fleas that find a rat
+        force_to_rats = i_f[i - 1] - force_to_humans
         fph[i] = fph[i - 1] + flea_growth
         i_f[i] = i_f[i - 1] + new_infectious - starvation_deaths
 
         # - Rats
         new_infected_rats = min(s_r[i - 1], beta_r * s_r[i - 1] * force_to_rats / N_r)
         new_removed_rats = gamma_r * i_r[i - 1]
-        new_recovered_rats = por_r * new_removed_rats
+        new_recovered_rats = p_recovery_ur * new_removed_rats
         new_dead_rats = new_removed_rats - new_recovered_rats
         infected_rat_deaths = new_dead_rats
 
         # born rats
-        resistant_born_rats = (rep_rate_r * rec_r[i - 1] * (inh_res - (N_r / s_h)))
-        resistant_born_rats = 0 if N_r / s_h < 0 else resistant_born_rats
-        unresistant_from_resistant = (rep_rate_ur * rec_r[i - 1] * (1. - inh_res))
-        unresistant_born_rats = (rep_rate_ur * s_r[i - 1] * (1. - (N_r / s_h)))
-        unresistant_born_rats = 0 if N_r / s_h < 0 else unresistant_born_rats
+        resistant_born_rats = (rep_rate_r * res_r[i - 1] * (inh_res - (N_r / (s_h * sus_frac))))
+        resistant_born_rats = 0 if N_r / (s_h * sus_frac) < 0 else resistant_born_rats
+        unresistant_from_resistant = (rep_rate_ur * res_r[i - 1] * (1. - inh_res))
+        unresistant_born_rats = (rep_rate_ur * (res_r[i - 1] + s_r[i - 1]) * (1. - (N_r / (s_h * sus_frac))))
+        unresistant_born_rats = 0 if N_r / (s_h * sus_frac) < 0 else unresistant_born_rats
         born_rats = unresistant_born_rats + unresistant_from_resistant
 
         # natural deaths
-        natural_death_unresistant = (s_r[i - 1] * d_rate)
-        natural_death_resistant = (rec_r[i - 1] * d_rate)
+        natural_death_unresistant = (s_r[i - 1] * d_rate_ui)
+        natural_death_resistant = (res_r[i - 1] * d_rate_ui)
+        # rec
 
         # time step values
         s_r[i] = s_r[i - 1] + born_rats - new_infected_rats - natural_death_unresistant
         i_r[i] = i_r[i - 1] + new_infected_rats - new_removed_rats
-        rec_r[i] = rec_r[i - 1] + new_recovered_rats + resistant_born_rats - natural_death_resistant
+        # rec_r[i] = rec_r[i - 1] + new_recovered_rats - natural_death_recovered
+        res_r[i] = res_r[i - 1] + new_recovered_rats + resistant_born_rats - natural_death_resistant
         d_r[i] = new_dead_rats + natural_death_unresistant + natural_death_resistant
 
         # - Humans
         N_h = s_h + i_h[i - 1] + r_h[i - 1]
         new_infected_humans = min(s_h, beta_h * s_h * force_to_humans / N_h)
         new_removed_humans = gamma_h * i_h[i - 1]
-        new_recovered_humans = por_h * new_removed_humans
+        new_recovered_humans = p_recovery_h * new_removed_humans
         new_dead_humans = new_removed_humans - new_recovered_humans
 
         # time step values
@@ -121,7 +131,9 @@ def run():
     ax.plot(years_list, d_r, label='dead_rats')
     ax.plot(years_list, s_r, label='susceptible rats')
     ax.plot(years_list, i_r, label="infected rats")
-    ax.plot(years_list, rec_r, label="resistant rats")
+    # ax.plot(years_list, rec_r, label="recovered rats")
+    ax.plot(years_list, res_r, label="resistant rats")
+    ax.plot(years_list, d_h, label="I see dead people")
 
     # format the ticks
     ax.xaxis.set_major_locator(years)
@@ -150,6 +162,7 @@ def run():
     plt.rc('font', size=16)
     plt.rc('lines', linewidth=2)
     plt.rc('figure', autolayout=True)
+    plt.title(title)
     plt.xlabel('time in years')
     plt.ylabel('number of rats')
     # plt.savefig('SIRD_model.png')
