@@ -1,15 +1,23 @@
 import numpy as np
 import scipy as sp
+import theano
+from theano.ifelse import ifelse
+from theano import tensor as T
 import pymc3 as pm
 import pandas as pd
 from datetime import date
-import matplotlib.dates as mdates
+# import matplotlib.dates as mdates
+
+# theano config
+theano.config.optimizer='fast_compile'
+theano.config.exception_verbosity='high'
+theano.config.compute_test_value = 'warn'
 
 def run():
     with pm.Model() as plague_model:
-        years = mdates.YearLocator()  # every year
-        months = mdates.MonthLocator()  # every month
-        yearsFmt = mdates.DateFormatter('%Y')
+        # years = mdates.YearLocator()  # every year
+        # months = mdates.MonthLocator()  # every month
+        # yearsFmt = mdates.DateFormatter('%Y')
         years_list = pd.date_range(date(1990, 1, 1), date(2000, 12, 31)).tolist()
 
         # -- Params
@@ -62,6 +70,13 @@ def run():
         fph[0] = c_cap
         searching = 3. / (s_r[0] + res_r[0])
 
+        # -- functions and conditions
+        a, n = T.dscalars('a', 'n')
+        a.tag.test_value = 1.
+        n.tag.test_value = 0.
+        non_negative = ifelse(T.lt(a, n), n, a)
+        f_non_negative = theano.function([a, n], non_negative,
+                                         mode=theano.Mode(linker='vm'))
         # -- Simulate
         for i in t[1:]:
             # + rec_r[i - 1]
@@ -81,14 +96,16 @@ def run():
             new_infectious = infected_rat_deaths * fph[i - 1]
             starvation_deaths = d_rate * i_f[i - 1]
             # number of fleas that find a human
-            force_to_humans = min(i_f[i - 1], i_f[i - 1] * np.exp(-searching * N_r))
+            force_to_humans = i_f[i - 1] * np.exp(-searching * N_r)
+            force_to_humans = f_non_negative([force_to_humans], 0.)
             # number of fleas that find a rat
             force_to_rats = i_f[i - 1] - force_to_humans
             fph[i] = fph[i - 1] + flea_growth
             i_f[i] = i_f[i - 1] + new_infectious - starvation_deaths
 
             # - Rats
-            new_infected_rats = min(s_r[i - 1], beta_r * s_r[i - 1] * force_to_rats / N_r)
+            new_infected_rats = beta_r * s_r[i - 1] * force_to_rats / N_r
+            new_infected_rats = 0 if new_infected_rats < 0 else new_infected_rats
             new_removed_rats = gamma_r * i_r[i - 1]
             new_recovered_rats = p_recovery_ur * new_removed_rats
             new_dead_rats = new_removed_rats - new_recovered_rats

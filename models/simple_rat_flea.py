@@ -87,7 +87,8 @@ def run(title):
         i_f[i] = i_f[i - 1] + new_infectious - starvation_deaths
 
         # - Rats
-        new_infected_rats = min(s_r[i - 1], beta_r * s_r[i - 1] * force_to_rats / N_r)
+        new_infected_rats = beta_r * s_r[i - 1] * force_to_rats / N_r
+        new_infected_rats = 0 if new_infected_rats < 0 else new_infected_rats
         new_removed_rats = gamma_r * i_r[i - 1]
         new_recovered_rats = p_recovery_ur * new_removed_rats
         new_dead_rats = new_removed_rats - new_recovered_rats
