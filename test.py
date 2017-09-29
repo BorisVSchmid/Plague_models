@@ -13,8 +13,6 @@ theano.config.optimizer='fast_compile'
 theano.config.exception_verbosity='high'
 theano.config.compute_test_value = 'warn'
 
-new_
-
 def run():
     with pm.Model() as plague_model:
         # years = mdates.YearLocator()  # every year
@@ -63,7 +61,7 @@ def run():
         g_rate = .0084
         c_cap = 6.
         fph[0] = c_cap
-        searching = 3. / (s_r + res_r[0])
+        searching = 3. / (s_r + res_r)
 
         # -- functions and conditions
         # a, n = T.dscalars('a', 'n')
@@ -115,7 +113,7 @@ def run():
 
         # - Humans
         N_h = s_h + i_h + r_h
-        new_infected_humans = min(s_h, beta_h * s_h * force_to_humans / N_h)
+        new_infected_humans = s_h, beta_h * s_h * force_to_humans / N_h
         new_removed_humans = gamma_h * i_h
         new_recovered_humans = p_recovery_h * new_removed_humans
         new_dead_humans = new_removed_humans - new_recovered_humans

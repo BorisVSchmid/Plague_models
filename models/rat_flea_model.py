@@ -71,12 +71,13 @@ def run():
         searching = 3. / (s_r[0] + res_r[0])
 
         # -- functions and conditions
-        a, n = T.dscalars('a', 'n')
-        a.tag.test_value = 1.
-        n.tag.test_value = 0.
-        non_negative = ifelse(T.lt(a, n), n, a)
-        f_non_negative = theano.function([a, n], non_negative,
-                                         mode=theano.Mode(linker='vm'))
+        # theano.config.floatX = 'float32'
+        # zero = T.constant(np.asarray(0, dtype=theano.config.floatX))
+        # a = T.fscalars('a')
+        # a.tag.test_value = 1.
+        # non_negative = ifelse(T.lt(a, zero), zero, a)
+        # f_non_negative = theano.function([a], non_negative,
+        #                                  mode=theano.Mode(linker='vm'))
         # -- Simulate
         for i in t[1:]:
             # + rec_r[i - 1]
@@ -97,7 +98,6 @@ def run():
             starvation_deaths = d_rate * i_f[i - 1]
             # number of fleas that find a human
             force_to_humans = i_f[i - 1] * np.exp(-searching * N_r)
-            force_to_humans = f_non_negative([force_to_humans], 0.)
             # number of fleas that find a rat
             force_to_rats = i_f[i - 1] - force_to_humans
             fph[i] = fph[i - 1] + flea_growth
@@ -105,7 +105,6 @@ def run():
 
             # - Rats
             new_infected_rats = beta_r * s_r[i - 1] * force_to_rats / N_r
-            new_infected_rats = 0 if new_infected_rats < 0 else new_infected_rats
             new_removed_rats = gamma_r * i_r[i - 1]
             new_recovered_rats = p_recovery_ur * new_removed_rats
             new_dead_rats = new_removed_rats - new_recovered_rats
@@ -113,10 +112,8 @@ def run():
 
             # born rats
             resistant_born_rats = (rep_rate_r * res_r[i - 1] * (inh_res - (N_r / (s_h * sus_frac))))
-            resistant_born_rats = 0 if N_r / (s_h * sus_frac) < 0 else resistant_born_rats
             unresistant_from_resistant = (rep_rate_ur * res_r[i - 1] * (1. - inh_res))
             unresistant_born_rats = (rep_rate_ur * (res_r[i - 1] + s_r[i - 1]) * (1. - (N_r / (s_h * sus_frac))))
-            unresistant_born_rats = 0 if N_r / (s_h * sus_frac) < 0 else unresistant_born_rats
             born_rats = unresistant_born_rats + unresistant_from_resistant
 
             # natural deaths
@@ -133,7 +130,7 @@ def run():
 
             # - Humans
             N_h = s_h + i_h[i - 1] + r_h[i - 1]
-            new_infected_humans = min(s_h, beta_h * s_h * force_to_humans / N_h)
+            new_infected_humans = beta_h * s_h * force_to_humans / N_h
             new_removed_humans = gamma_h * i_h[i - 1]
             new_recovered_humans = p_recovery_h * new_removed_humans
             new_dead_humans = new_removed_humans - new_recovered_humans
