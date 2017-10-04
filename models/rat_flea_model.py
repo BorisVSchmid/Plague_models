@@ -1,12 +1,10 @@
 import numpy as np
 import scipy as sp
 import theano
-from theano.ifelse import ifelse
-from theano import tensor as T
+import theano.tensor as T
 import pymc3 as pm
 import pandas as pd
 from datetime import date
-# import matplotlib.dates as mdates
 
 # theano config
 theano.config.optimizer='fast_compile'
@@ -14,11 +12,13 @@ theano.config.exception_verbosity='high'
 theano.config.compute_test_value = 'warn'
 
 def run():
+    with open("sim_md.csv", mode='r') as file:
+        md = [float(a) for a in file.read().split(', ')]
     with pm.Model() as plague_model:
         # years = mdates.YearLocator()  # every year
         # months = mdates.MonthLocator()  # every month
         # yearsFmt = mdates.DateFormatter('%Y')
-        years_list = pd.date_range(date(1990, 1, 1), date(2000, 12, 31)).tolist()
+        years_list = pd.date_range(date(1990, 1, 1), date(1990, 12, 31)).tolist()
 
         # -- Params
         temp = [[31.1, 27.1, 23.6, 82], [30.8, 27.2, 23.8, 83], [32.5, 27.5, 23.6, 81], [32.5, 27.4, 22.9, 73],
@@ -53,14 +53,13 @@ def run():
         i_r[0] = 15.
         gamma_r = 0.2
         # .1 \/
-        p_recovery_ur = .058
+        p_recovery_ur = .1
         rep_rate_r = .4 * (1 - 0.234)
         rep_rate_ur = .4
         inh_res = 0.975
         d_rate_ui = 1 / (365 * 1)
 
         # - flea
-
         i_f = np.zeros_like(t, dtype=object)
         fph = np.zeros_like(t, dtype=object)
         d_rate = 0.2
@@ -70,14 +69,6 @@ def run():
         fph[0] = c_cap
         searching = 3. / (s_r[0] + res_r[0])
 
-        # -- functions and conditions
-        # theano.config.floatX = 'float32'
-        # zero = T.constant(np.asarray(0, dtype=theano.config.floatX))
-        # a = T.fscalars('a')
-        # a.tag.test_value = 1.
-        # non_negative = ifelse(T.lt(a, zero), zero, a)
-        # f_non_negative = theano.function([a], non_negative,
-        #                                  mode=theano.Mode(linker='vm'))
         # -- Simulate
         for i in t[1:]:
             # + rec_r[i - 1]
@@ -139,12 +130,13 @@ def run():
             i_h[i] = i_h[i - 1] + new_infected_humans - new_removed_humans
             r_h[i] = r_h[i - 1] + new_recovered_humans
             d_h[i] = new_dead_humans
+        obs = pm.Poisson('obs', mu=d_h, observed=md)
 
     with plague_model:
-        nuts_trace = pm.sample(1000)
-
-    pm.traceplot(nuts_trace)
-    pm.summary(nuts_trace)
+        approx = pm.fit()
+        nuts_trace = approx.sample(2000)
+        pm.summary(nuts_trace)
+        pm.traceplot(nuts_trace)
 
 
 
