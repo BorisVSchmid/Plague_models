@@ -1,13 +1,12 @@
 import numpy as np
 import pandas as pd
 from datetime import date
-import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-import random
 import pymc as pm
+from models import manual_fit as mf
 
 
-def run(title, beta_h, sus_frac, beta_r, i_r0):
+def run(beta_h, sus_frac, beta_r, i_r0):
     md = []
     with open("sim_md.csv", mode='r') as file:
         [md.append(float(a)) for a in file.read().split(', ')]
@@ -140,7 +139,8 @@ def run(title, beta_h, sus_frac, beta_r, i_r0):
 
     # Likelihood
     mortality = pm.Poisson('mortality', mu=d_h, value=md, observed=True)
-    print(pm.Poisson('mortality_sim', mu=d_h))
+    mortality_sim = pm.Poisson('mortality_sim', mu=d_h)
+    return mortality.logp
 
     # fig, ax = plt.subplots()
 
@@ -183,9 +183,15 @@ def run(title, beta_h, sus_frac, beta_r, i_r0):
     # plt.ylabel('number of rats')
     # plt.savefig('SIRD_model.png')
 
-    with open('sim_md_n.csv', mode='a') as file:
-        file.write(", ".join([str(a) for a in d_h.tolist()]) + '\n')
+    # with open('sim_md_n.csv', mode='a') as file:
+    #     file.write(", ".join([str(a) for a in d_h.tolist()]) + '\n')
 
 
 if __name__ == "__main__":
     # make a simple loop for testing priors.
+    beta_h = mf.Distribution('beta_h', lower=1e-9, upper=.2, value=.01)
+    sus_frac = mf.Distribution('fraction', lower=1e-9, upper=1., value=.01)
+    beta_r = mf.Distribution('beta_r', lower=1e-9, upper=1.0, value=.01)
+    i_r0 = mf.Distribution('i_r0', lower=0, upper=18., value=18.)
+    mc = mf.GaussianWalk(10, run, beta_h, sus_frac, beta_r, i_r0)
+    mc.start()

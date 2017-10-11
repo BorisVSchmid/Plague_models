@@ -1,7 +1,6 @@
 import pymc as pm
 import numpy as np
 import pandas as pd
-import random
 from datetime import date
 
 
@@ -31,15 +30,15 @@ decade_list = [x for x in decade.keys()]
 t = [x for x in range(0, len(decade))]
 
 # - Human
-beta = pm.Uniform('beta', lower=1e-9, upper=.2, value=0.2)
+beta = pm.Uniform('beta', lower=1e-3, upper=.2, value=0.1)
 s_h = 25000.
 gamma_h = 0.1
 p_recovery_h = .4
 
 # - rat
-fraction = pm.Uniform('fraction', lower=1e-9, upper=1., value=.08)
-sigma = pm.Uniform('sigma', lower=1e-9, upper=1.0, value=.08)
-i_r0 = pm.Uniform('i_r0', lower=0, upper=10000., value=15.)
+fraction = pm.Uniform('fraction', lower=1e-3, upper=1., value=.5)
+sigma = pm.Uniform('sigma', lower=1e-3, upper=1., value=.5)
+i_r0 = pm.Uniform('i_r0', lower=1., upper=17., value=9.)
 # 0.08
 s_r0 = s_h * fraction
 # rec_r[0] = s_h * fraction
@@ -85,9 +84,7 @@ def plague_model(s_r0=s_r0, res_r0=res_r0, i_r0=i_r0, fph0=fph0, beta=beta, frac
 
     # -- Simulate
     for i, v in enumerate(decade_list[1:], 1):
-        temps = decade[v]
-        temp = temps[1]
-        temp_fac = ((temp - 18)/((14/3)*4)) + (1 / 4)
+        temp_fac = ((decade[v][1] - 18)/((14/3)*4)) + (1 / 4)
         # + rec_r[i - 1]
         N_r = s_r[i - 1] + i_r[i - 1] + res_r[i - 1]
         # - Fleas
@@ -148,7 +145,7 @@ def plague_model(s_r0=s_r0, res_r0=res_r0, i_r0=i_r0, fph0=fph0, beta=beta, frac
         # time step values
         i_h[i] = i_h[i - 1] + new_infected_humans - new_removed_humans
         r_h[i] = r_h[i - 1] + new_recovered_humans
-        d_h[i] = 0.0000001 + new_dead_humans
+        d_h[i] = 0.0001 + new_dead_humans
     return i_h, r_h, d_h, s_r, i_r, res_r, d_r, i_f, fph
 
 
