@@ -1,27 +1,15 @@
 import pymc as pm
 import numpy as np
-import pandas as pd
-from datetime import date
+
 
 __all__ = ['md', 'beta', 's_h', 'gamma_h', 'p_recovery_h', 'fraction', 'sigma', 'i_r0', 's_r0', 'gamma_r',
            'p_recovery_ur', 'rep_rate_r', 'rep_rate_ur', 'inh_res', 'd_rate_ui', 'd_rate', 'g_rate', 'c_cap',
            'fph0', 'searching', 'd_', 'mortality', 'mortality_sim']
 
-md = np.asarray(map(float, open('sim_md.csv', 'r').read().split(', ')), dtype=float)
-
-years_list = pd.date_range(date(1990, 1, 1), date(1990, 12, 31)).tolist()
-
-# -- Params
-temp = [[31.1, 27.1, 23.6], [30.8, 27.2, 23.8], [32.5, 27.5, 23.6], [32.5, 27.4, 22.9], [32.0, 26.1, 20.6],
-        [31.0, 24.6, 18.6], [30.8, 24.2, 18.0], [31.4, 24.6, 18.4], [32.1, 25.4, 19.6], [32.5, 26.8, 22.0],
-        [32.2, 27.7, 23.5], [31.3, 27.4, 23.7]]
-
-decade = {}
-for time in years_list:
-    time = time.strftime("%Y-%m-%d")
-    decade[time] = temp[int(time.split("-")[1]) - 1]
+md = np.array(map(float, open('sim_md.csv', 'r').read().split(', ')), dtype=float)
+decade = {key: [float(y) for y in value.split(", ")] for (key, value) in map(lambda x: x.split(' : '), open('time.date').readlines())}
 decade_list = [x for x in decade.keys()]
-t = [x for x in range(0, len(decade))]
+t = len(decade)
 
 # - Human
 beta = pm.Uniform('beta', lower=1e-3, upper=.2, value=0.1)
@@ -33,7 +21,7 @@ p_recovery_h = .4
 fraction = pm.Uniform('fraction', lower=1e-3, upper=1., value=.5)
 # sigma = pm.Uniform('sigma', lower=1e-3, upper=1., value=.5)
 # i_r0 = pm.Uniform('i_r0', lower=1., upper=17., value=9.)
-sigma = .8
+sigma = .08
 i_r0 = 15.
 # 0.08
 s_r0 = s_h * fraction
@@ -59,23 +47,23 @@ searching = 3. / (s_r0 + res_r0)
 def plague_model(s_r0=s_r0, res_r0=res_r0, i_r0=i_r0, fph0=fph0, beta=beta, fraction=fraction, sigma=sigma):
     # -- Params
     # - Human
-    i_h = np.zeros_like(t, dtype=float)
-    r_h = np.zeros_like(t, dtype=float)
-    d_h = np.zeros_like(t, dtype=float)
+    i_h = np.zeros(t)
+    r_h = np.zeros(t)
+    d_h = np.zeros(t)
     d_h[0] = 0.0000001
 
     # - rat
-    s_r = np.zeros_like(t, dtype=float)
-    i_r = np.zeros_like(t, dtype=float)
-    res_r = np.zeros_like(t, dtype=float)
-    d_r = np.zeros_like(t, dtype=float)
+    s_r = np.zeros(t)
+    i_r = np.zeros(t)
+    res_r = np.zeros(t)
+    d_r = np.zeros(t)
     i_r[0] = i_r0
     s_r[0] = s_r0
     res_r[0] = res_r0
 
     # - flea
-    i_f = np.zeros_like(t, dtype=float)
-    fph = np.zeros_like(t, dtype=float)
+    i_f = np.zeros(t)
+    fph = np.zeros(t)
     fph[0] = fph0
 
     # -- Simulate
@@ -139,7 +127,7 @@ def plague_model(s_r0=s_r0, res_r0=res_r0, i_r0=i_r0, fph0=fph0, beta=beta, frac
         # time step values
         i_h[i] = i_h[i - 1] + new_infected_humans - new_removed_humans
         r_h[i] = r_h[i - 1] + new_recovered_humans
-        d_h[i] = 0.0001 + new_dead_humans
+        d_h[i] = new_dead_humans
     return i_h, r_h, d_h, s_r, i_r, res_r, d_r, i_f, fph
 
 
