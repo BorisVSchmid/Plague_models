@@ -3,29 +3,23 @@ import numpy as np
 import pandas as pd
 from datetime import date
 
-
-md = []
-with open("sim_md.csv", mode='r') as file:
-    [md.append(float(a)) for a in file.read().split(', ')]
-
 __all__ = ['md', 'beta', 's_h', 'gamma_h', 'p_recovery_h', 'fraction', 'sigma', 'i_r0', 's_r0', 'gamma_r',
            'p_recovery_ur', 'rep_rate_r', 'rep_rate_ur', 'inh_res', 'd_rate_ui', 'd_rate', 'g_rate', 'c_cap',
            'fph0', 'searching', 'd_', 'mortality', 'mortality_sim']
 
-# years = mdates.YearLocator()  # every year
-# months = mdates.MonthLocator()  # every month
-# yearsFmt = mdates.DateFormatter('%Y')
+md = np.asarray(map(float, open('sim_md.csv', 'r').read().split(', ')), dtype=float)
+
 years_list = pd.date_range(date(1990, 1, 1), date(1990, 12, 31)).tolist()
 
 # -- Params
-temp = [[31.1, 27.1, 23.6, 82], [30.8, 27.2, 23.8, 83], [32.5, 27.5, 23.6, 81], [32.5, 27.4, 22.9, 73],
-        [32.0, 26.1, 20.6, 67], [31.0, 24.6, 18.6, 64], [30.8, 24.2, 18.0, 62], [31.4, 24.6, 18.4, 60],
-        [32.1, 25.4, 19.6, 63], [32.5, 26.8, 22.0, 66], [32.2, 27.7, 23.5, 72], [31.3, 27.4, 23.7, 80]]
+temp = [[31.1, 27.1, 23.6], [30.8, 27.2, 23.8], [32.5, 27.5, 23.6], [32.5, 27.4, 22.9], [32.0, 26.1, 20.6],
+        [31.0, 24.6, 18.6], [30.8, 24.2, 18.0], [31.4, 24.6, 18.4], [32.1, 25.4, 19.6], [32.5, 26.8, 22.0],
+        [32.2, 27.7, 23.5], [31.3, 27.4, 23.7]]
+
 decade = {}
 for time in years_list:
     time = time.strftime("%Y-%m-%d")
-    time_s = time.split("-")
-    decade[time] = temp[int(time_s[1]) - 1]
+    decade[time] = temp[int(time.split("-")[1]) - 1]
 decade_list = [x for x in decade.keys()]
 t = [x for x in range(0, len(decade))]
 
@@ -37,8 +31,10 @@ p_recovery_h = .4
 
 # - rat
 fraction = pm.Uniform('fraction', lower=1e-3, upper=1., value=.5)
-sigma = pm.Uniform('sigma', lower=1e-3, upper=1., value=.5)
-i_r0 = pm.Uniform('i_r0', lower=1., upper=17., value=9.)
+# sigma = pm.Uniform('sigma', lower=1e-3, upper=1., value=.5)
+# i_r0 = pm.Uniform('i_r0', lower=1., upper=17., value=9.)
+sigma = .8
+i_r0 = 15.
 # 0.08
 s_r0 = s_h * fraction
 # rec_r[0] = s_h * fraction
@@ -49,7 +45,7 @@ p_recovery_ur = .1
 rep_rate_r = .4 * (1 - 0.234)
 rep_rate_ur = .4
 inh_res = 0.975
-d_rate_ui = 1 / (365 * 1)
+d_rate_ui = 1 / 365
 
 # - flea
 d_rate = 0.2
@@ -109,18 +105,16 @@ def plague_model(s_r0=s_r0, res_r0=res_r0, i_r0=i_r0, fph0=fph0, beta=beta, frac
         i_f[i] = i_f[i - 1] + new_infectious - starvation_deaths
 
         # - Rats
-        new_infected_rats = sigma * s_r[i - 1] * force_to_rats / N_r
-        new_infected_rats = 0 if new_infected_rats < 0 else new_infected_rats
+        new_infected_rats = max(0, sigma * s_r[i - 1] * force_to_rats / N_r)
         new_removed_rats = gamma_r * i_r[i - 1]
         new_recovered_rats = p_recovery_ur * new_removed_rats
         new_dead_rats = new_removed_rats - new_recovered_rats
         infected_rat_deaths = new_dead_rats
 
         # born rats
-        pressure = 0 if (N_r / (s_h * fraction)) < 0 else (N_r / (s_h * fraction))
-        resistant_born_rats = (rep_rate_r * res_r[i - 1] * (inh_res - pressure))
+        resistant_born_rats = max(0, rep_rate_r * res_r[i - 1] * (inh_res - (N_r / (s_h * fraction))))
         unresistant_from_resistant = (rep_rate_ur * res_r[i - 1] * (1. - inh_res))
-        unresistant_born_rats = (rep_rate_ur * (res_r[i - 1] + s_r[i - 1]) * (1. - pressure))
+        unresistant_born_rats = max(0, rep_rate_ur * (res_r[i - 1] + s_r[i - 1]) * (1. - (N_r / (s_h * fraction))))
         born_rats = unresistant_born_rats + unresistant_from_resistant
 
         # natural deaths
@@ -150,7 +144,6 @@ def plague_model(s_r0=s_r0, res_r0=res_r0, i_r0=i_r0, fph0=fph0, beta=beta, frac
 
 
 d_ = pm.Lambda('d_', lambda plague_model=plague_model: plague_model[2])
-md = np.asarray(md, dtype=float)
 
 #Likelihood
 mortality = pm.Poisson('mortality', mu=d_, value=md, observed=True)

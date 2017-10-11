@@ -183,15 +183,16 @@ def run(beta_h, sus_frac, beta_r, i_r0):
     # plt.ylabel('number of rats')
     # plt.savefig('SIRD_model.png')
 
-    # with open('sim_md_n.csv', mode='a') as file:
-    #     file.write(", ".join([str(a) for a in d_h.tolist()]) + '\n')
+    with open('sim_md.csv', mode='a') as file:
+        file.write(", ".join([str(a) for a in d_h.tolist()]) + '\n')
 
 
 if __name__ == "__main__":
     # make a simple loop for testing priors.
-    beta_h = mf.Distribution('beta_h', lower=1e-9, upper=.2, value=.01)
-    sus_frac = mf.Distribution('fraction', lower=1e-9, upper=1., value=.01)
-    beta_r = mf.Distribution('beta_r', lower=1e-9, upper=1.0, value=.01)
-    i_r0 = mf.Distribution('i_r0', lower=0, upper=18., value=18.)
-    mc = mf.GaussianWalk(10, run, beta_h, sus_frac, beta_r, i_r0)
-    mc.start()
+    # beta_h = mf.Distribution('beta_h', lower=1e-9, upper=.2, value=.01)
+    # sus_frac = mf.Distribution('fraction', lower=1e-9, upper=1., value=.01)
+    # beta_r = mf.Distribution('beta_r', lower=1e-9, upper=1.0, value=.01)
+    # i_r0 = mf.Distribution('i_r0', lower=0, upper=18., value=18.)
+    # mc = mf.GaussianWalk(10, run, beta_h, sus_frac, beta_r, i_r0)
+    # mc.start()
+    run(.1, .08, .08, 15.)
