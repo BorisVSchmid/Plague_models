@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     mc = pm.MCMC(vars)
     mc.use_step_method(pm.AdaptiveMetropolis, [beta, fraction])
-    mc.sample(iter=1000, burn=500, thin=2, verbose=1)
+    mc.sample(iter=200, verbose=1)
     mc.summary()
     M = pm.MAP(mc)
     print('fit')
