@@ -16,18 +16,21 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
     months = mdates.MonthLocator()  # every month
     yearsFmt = mdates.DateFormatter('%Y')
     # years_list = pd.date_range(date(1990, 1, 1), date(2000, 12, 31)).tolist()
-    years_list = pd.date_range(date(1990, 1, 1), date(1991, 12, 31)).tolist()
+    years_list = pd.date_range(date(1991, 1, 1), date(1999, 12, 31)).tolist()
 
     # -- Params
     temp = [[31.1, 27.1, 23.6, 82], [30.8, 27.2, 23.8, 83], [32.5, 27.5, 23.6, 81], [32.5, 27.4, 22.9, 73],
          [32.0, 26.1, 20.6, 67], [31.0, 24.6, 18.6, 64], [30.8, 24.2, 18.0, 62], [31.4, 24.6, 18.4, 60],
          [32.1, 25.4, 19.6, 63], [32.5, 26.8, 22.0, 66], [32.2, 27.7, 23.5, 72], [31.3, 27.4, 23.7, 80]]
+    warming = {"1990":0.275, "1991":0.26, "1992":0.25, "1993":0.25, "1994":0.252, "1995":0.285,
+               "1996":0.318, "1997":0.351, "1998":0.384, "1999":0.417, "2000":0.45}
     decade = {}
     for time in years_list:
         time = time.strftime("%Y-%m-%d")
         time_s = time.split("-")
-        decade[time] = temp[int(time_s[1])-1]
-    decade_list = [x for x in decade.keys()]
+        year = time_s[0]
+        decade[time] = list(map(lambda x: x + warming[year], temp[int(time_s[1])-1][:-1]))
+        decade[time].append(temp[int(time_s[1])-1][3])
     t = [x for x in range(0, len(decade))]
 
     # - Human
@@ -50,7 +53,7 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
     d_r = np.zeros_like(t)
     sus_frac = sus_frac
     # 0.08
-    s_r[0] = s_h * sus_frac
+    s_r[0] = (s_h * sus_frac) - 20
     beta_r = beta_r
     # .08
     i_r[0] = i_r0
@@ -73,13 +76,25 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
     fph[0] = c_cap
     searching = 3. / (s_r[0] + res_r[0])
 
+    # temps
+
+    temp_data = np.zeros_like(t)
+    temp_data[0] = 23.875
+
     # -- Simulate
-    for i, v in enumerate(decade_list[1:], 1):
-        temps = decade[v]
+    for i, v in enumerate(years_list[1:], 1):
+        temps = decade[v.strftime("%Y-%m-%d")]
         temp = temps[2]
+        temp_data[i] = temp
         temp_fac = ((temp - 18)/((14/3)*4)) + (1 / 4)
         # + rec_r[i - 1]
         N_r = s_r[i - 1] + i_r[i - 1] + res_r[i - 1]
+
+        # natural deaths
+        natural_death_unresistant = (s_r[i - 1] * d_rate_ui)
+        natural_death_resistant = (res_r[i - 1] * d_rate_ui)
+
+
         # - Fleas
         if i == 1:
             infected_rat_deaths = d_h[0]
@@ -90,18 +105,21 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         else:
             flea_growth = 0.
 
-        new_infectious = infected_rat_deaths * fph[i - 1]
+        new_infectious = (infected_rat_deaths) * fph[i - 1]
+        # could be made temperature dependent
         starvation_deaths = d_rate * i_f[i - 1]
         # number of fleas that find a human
         force_to_humans = min(i_f[i - 1], i_f[i - 1] * np.exp(-searching * N_r))
+        force_to_humans = 0.9 * force_to_humans if temp <= 27.5 else force_to_humans
         # number of fleas that find a rat
         force_to_rats = i_f[i - 1] - force_to_humans
+        force_to_rats = 0.9 * force_to_rats if temp <= 27.5 else force_to_rats
         fph[i] = fph[i - 1] + flea_growth
+        # should add dehydration
         i_f[i] = i_f[i - 1] + new_infectious - starvation_deaths
 
         # - Rats
         new_infected_rats = beta_r * s_r[i - 1] * force_to_rats / N_r
-        new_infected_rats += 2 if temp <= 19 else 0
         new_infected_rats = 0 if new_infected_rats < 0 else new_infected_rats
         new_removed_rats = gamma_r * i_r[i - 1]
         new_recovered_rats = p_recovery_ur * new_removed_rats
@@ -109,22 +127,21 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         infected_rat_deaths = new_dead_rats
 
         # born rats
-        pressure = 0 if N_r / (s_h * sus_frac) < 0 else N_r / (s_h * sus_frac)
-        resistant_born_rats = (rep_rate_r * res_r[i - 1] * (inh_res - pressure))
-        unresistant_from_resistant = (rep_rate_ur * res_r[i - 1] * (1. - inh_res))
-        unresistant_born_rats = (rep_rate_ur * (res_r[i - 1] + s_r[i - 1]) * (1. - pressure))
-        born_rats = unresistant_born_rats + unresistant_from_resistant
+        pressure = N_r / (s_h * sus_frac)
+        resistant_born_rats = rep_rate_r * res_r[i - 1] * (inh_res - pressure)
+        unresistant_born_rats = rep_rate_ur * ((res_r[i - 1] * (1 - inh_res)) + (s_r[i - 1] * (1 - pressure)))
 
-        # natural deaths
-        natural_death_unresistant = (s_r[i - 1] * d_rate_ui)
-        natural_death_resistant = (res_r[i - 1] * d_rate_ui)
         # rec
 
         # time step values
-        s_r[i] = s_r[i - 1] + born_rats - new_infected_rats - natural_death_unresistant
+
+        s_r[i] = min(s_h * sus_frac, s_r[i - 1] + unresistant_born_rats - new_infected_rats - natural_death_unresistant)
         i_r[i] = i_r[i - 1] + new_infected_rats - new_removed_rats
         res_r[i] = res_r[i - 1] + new_recovered_rats + resistant_born_rats - natural_death_resistant
         d_r[i] = new_dead_rats + natural_death_unresistant + natural_death_resistant
+
+        if i == 170 or i == 545:
+            i_r[i] = 80
 
         # - Humans
         N_h = s_h + i_h[i - 1] + r_h[i - 1]
@@ -153,6 +170,7 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
     ax.plot(years_list, i_r, label="infected rats")
     ax.plot(years_list, res_r, label="resistant rats")
     ax.plot(years_list, d_h, label="I see dead people")
+    # ax.plot(years_list, temp_data, label="temperature data")
 
     # format the ticks
     ax.xaxis.set_major_locator(years)
@@ -200,4 +218,4 @@ if __name__ == "__main__":
     # mc = mf.GaussianWalk(10, run, beta_h, sus_frac, beta_r, i_r0)
     # mc.start()
     # 0.975
-    run(.1, .08, .08, 0., 0.975)
+    run(.1, .12, .08, 0., 0.999)
