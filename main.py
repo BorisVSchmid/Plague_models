@@ -1,52 +1,88 @@
-from models.pymc2_test import *
+#from models.pymc2_test import *
+from tools.load_temp_data import TempLoader, TempReader
 import pymc as pm
 from pymc.Matplot import plot
 import matplotlib.pyplot as plt
 import pandas as pd
 from datetime import date
 import numpy as np
+import matplotlib.dates as mdates
 
-
-def set_time_period(start, finish):
-    years_list = pd.date_range(start, finish).tolist()
-
-    # -- Params
-    temp = np.array([[31.1, 27.1, 23.6], [30.8, 27.2, 23.8], [32.5, 27.5, 23.6], [32.5, 27.4, 22.9], [32.0, 26.1, 20.6],
-                    [31.0, 24.6, 18.6], [30.8, 24.2, 18.0], [31.4, 24.6, 18.4], [32.1, 25.4, 19.6], [32.5, 26.8, 22.0],
-                    [32.2, 27.7, 23.5], [31.3, 27.4, 23.7]])
-
-    with open('time.date', 'w') as file:
-        for time in years_list:
-            time = time.strftime("%Y-%m-%d")
-            file.write('{} : {}\n'.format(time, ', '.join([str(x) for x in temp[int(time.split("-")[1]) - 1]])))
-        return years_list
 
 if __name__ == "__main__":
-    # years_list = set_time_period(date(1990, 1, 1), date(1990, 12, 31))
-    vars = [md, beta, s_h, gamma_h, p_recovery_h, fraction, sigma, i_r0, s_r0, gamma_r,
-            p_recovery_ur, rep_rate_r, rep_rate_ur, inh_res, d_rate_ui, d_rate, g_rate, c_cap,
-            fph0, searching, d_, mortality, mortality_sim]
+    title = "Plague model"
+    years_list = pd.date_range(date(1980, 1, 1), date(2010, 12, 31)).tolist()
+    years = mdates.YearLocator()  # every year
+    months = mdates.MonthLocator()  # every month
+    yearsFmt = mdates.DateFormatter('%Y')
 
-    mc = pm.MCMC(vars)
-    mc.use_step_method(pm.AdaptiveMetropolis, [beta, fraction])
-    mc.sample(iter=200, verbose=1)
-    mc.summary()
-    M = pm.MAP(mc)
-    print('fit')
-    M.fit(method='fmin')
-    M.BIC
-    plot(mc)
-    plt.figure(figsize=(10, 10))
-    plt.title("Plague Mahajanga")
-    plt.xlabel('Day')
-    plt.ylabel('Deaths')
-    plt.plot(md, 'o', mec='black', color='black', label='Simulated data')
-    plt.plot(mortality_sim.stats()['mean'], color='red', linewidth=1, label='BPL (mean)')
-    y_min = mortality_sim.stats()['quantiles'][2.5]
-    y_max = mortality_sim.stats()['quantiles'][97.5]
-    plt.fill_between(range(0, len(md)), y_min, y_max, color='r', alpha=0.3, label='BPL (95% CI)')
-    plt.legend()
+    # data, temp_list = TempLoader().read_raw()
+    data, temp_list = TempLoader(start=1980, end=2010, update=True, fname="1112204").read_raw()
+
+    fig, ax = plt.subplots()
+
+    # plot the data
+    ax.plot(years_list, temp_list, label="temperature data")
+
+    # format the ticks
+    ax.xaxis.set_major_locator(years)
+    ax.xaxis.set_major_formatter(yearsFmt)
+    ax.xaxis.set_minor_locator(months)
+
+    # set the axis limit
+    datemin = min(years_list)
+    datemax = max(years_list) + 1
+    ax.set_xlim(datemin, datemax)
+
+
+    # format the coords message box
+    def price(x):
+        return '$%1.2f' % x
+
+
+    ax.format_xdata = mdates.DateFormatter('%Y-%m-%d')
+    ax.format_ydata = price
+    ax.grid(True)
+
+    # rotates and right aligns the x labels, and moves the bottom of the
+    # axes up to make room for them
+    fig.autofmt_xdate()
+
+    # some extra plot formating
+    ax.legend(loc='best')
+    plt.style.use('ggplot')
+    plt.rc('font', size=16)
+    plt.rc('lines', linewidth=2)
+    plt.rc('figure', autolayout=True)
+    plt.title(title)
+    plt.xlabel('time in years')
+    plt.ylabel('number of rats')
     plt.show()
+
+    # vars = [md, beta, s_h, gamma_h, p_recovery_h, fraction, sigma, i_r0, s_r0, gamma_r,
+    #         p_recovery_ur, rep_rate_r, rep_rate_ur, inh_res, d_rate_ui, d_rate, g_rate, c_cap,
+    #         fph0, searching, d_, mortality, mortality_sim]
+    #
+    # mc = pm.MCMC(vars)
+    # mc.use_step_method(pm.AdaptiveMetropolis, [beta, fraction])
+    # mc.sample(iter=200, verbose=1)
+    # mc.summary()
+    # M = pm.MAP(mc)
+    # print('fit')
+    # M.fit(method='fmin')
+    # M.BIC
+    # plot(mc)
+    # plt.figure(figsize=(10, 10))
+    # plt.title("Plague Mahajanga")
+    # plt.xlabel('Day')
+    # plt.ylabel('Deaths')
+    # plt.plot(md, 'o', mec='black', color='black', label='Simulated data')
+    # plt.plot(mortality_sim.stats()['mean'], color='red', linewidth=1, label='BPL (mean)')
+    # y_min = mortality_sim.stats()['quantiles'][2.5]
+    # y_max = mortality_sim.stats()['quantiles'][97.5]
+    # plt.fill_between(range(0, len(md)), y_min, y_max, color='r', alpha=0.3, label='BPL (95% CI)')
+    # plt.legend()
+    # plt.show()
 
 # from models.an_model import *
 # import pymc as pm

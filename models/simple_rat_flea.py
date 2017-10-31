@@ -2,13 +2,14 @@ import numpy as np
 import pandas as pd
 from datetime import date
 import matplotlib.dates as mdates
-import pymc as pm
-from models import manual_fit as mf
+from tools.load_temp_data import TempReader
 import matplotlib.pyplot as plt
 
 
 def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
     title = "Plague model"
+    start_year = 1980
+    end_year = 2010
     md = []
     with open("sim_md.csv", mode='r') as file:
         [md.append(float(a)) for a in file.read().split(', ')]
@@ -16,22 +17,11 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
     months = mdates.MonthLocator()  # every month
     yearsFmt = mdates.DateFormatter('%Y')
     # years_list = pd.date_range(date(1990, 1, 1), date(2000, 12, 31)).tolist()
-    years_list = pd.date_range(date(1991, 1, 1), date(1999, 12, 31)).tolist()
+    years_list = pd.date_range(date(start_year, 1, 1), date(end_year, 12, 31)).tolist()
 
     # -- Params
-    temp = [[31.1, 27.1, 23.6, 82], [30.8, 27.2, 23.8, 83], [32.5, 27.5, 23.6, 81], [32.5, 27.4, 22.9, 73],
-         [32.0, 26.1, 20.6, 67], [31.0, 24.6, 18.6, 64], [30.8, 24.2, 18.0, 62], [31.4, 24.6, 18.4, 60],
-         [32.1, 25.4, 19.6, 63], [32.5, 26.8, 22.0, 66], [32.2, 27.7, 23.5, 72], [31.3, 27.4, 23.7, 80]]
-    warming = {"1990":0.275, "1991":0.26, "1992":0.25, "1993":0.25, "1994":0.252, "1995":0.285,
-               "1996":0.318, "1997":0.351, "1998":0.384, "1999":0.417, "2000":0.45}
-    decade = {}
-    for time in years_list:
-        time = time.strftime("%Y-%m-%d")
-        time_s = time.split("-")
-        year = time_s[0]
-        decade[time] = list(map(lambda x: x + warming[year], temp[int(time_s[1])-1][:-1]))
-        decade[time].append(temp[int(time_s[1])-1][3])
-    t = [x for x in range(0, len(decade))]
+    data, temp_list = TempReader().cooked()
+    t = [x for x in range(0, len(data))]
 
     # - Human
     beta_h = beta_h
@@ -83,8 +73,8 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
 
     # -- Simulate
     for i, v in enumerate(years_list[1:], 1):
-        temps = decade[v.strftime("%Y-%m-%d")]
-        temp = temps[2]
+        temps = data[v.strftime("%Y-%m-%d")]
+        temp = temps[0]
         temp_data[i] = temp
         temp_fac = ((temp - 18)/((14/3)*4)) + (1 / 4)
         # + rec_r[i - 1]
@@ -93,6 +83,7 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         # natural deaths
         natural_death_unresistant = (s_r[i - 1] * d_rate_ui)
         natural_death_resistant = (res_r[i - 1] * d_rate_ui)
+        natural_death_infected = (i_r[i - 1] * d_rate_ui)
 
 
         # - Fleas
@@ -110,10 +101,10 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         starvation_deaths = d_rate * i_f[i - 1]
         # number of fleas that find a human
         force_to_humans = min(i_f[i - 1], i_f[i - 1] * np.exp(-searching * N_r))
-        force_to_humans = 0.9 * force_to_humans if temp <= 27.5 else force_to_humans
         # number of fleas that find a rat
         force_to_rats = i_f[i - 1] - force_to_humans
-        force_to_rats = 0.9 * force_to_rats if temp <= 27.5 else force_to_rats
+        force_to_rats = force_to_rats * (0.75 - 0.25 * np.tanh(((temp * 9/5) + 32) - 80))
+        force_to_humans = force_to_humans * (0.75 - 0.25 * np.tanh(((temp * 9/5) + 32) - 80))
         fph[i] = fph[i - 1] + flea_growth
         # should add dehydration
         i_f[i] = i_f[i - 1] + new_infectious - starvation_deaths
@@ -121,7 +112,7 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         # - Rats
         new_infected_rats = beta_r * s_r[i - 1] * force_to_rats / N_r
         new_infected_rats = 0 if new_infected_rats < 0 else new_infected_rats
-        new_removed_rats = gamma_r * i_r[i - 1]
+        new_removed_rats = gamma_r * (i_r[i - 1] - natural_death_infected)
         new_recovered_rats = p_recovery_ur * new_removed_rats
         new_dead_rats = new_removed_rats - new_recovered_rats
         infected_rat_deaths = new_dead_rats
@@ -136,12 +127,13 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         # time step values
 
         s_r[i] = min(s_h * sus_frac, s_r[i - 1] + unresistant_born_rats - new_infected_rats - natural_death_unresistant)
-        i_r[i] = i_r[i - 1] + new_infected_rats - new_removed_rats
+        i_r[i] = i_r[i - 1] + new_infected_rats - new_removed_rats - natural_death_infected
         res_r[i] = res_r[i - 1] + new_recovered_rats + resistant_born_rats - natural_death_resistant
         d_r[i] = new_dead_rats + natural_death_unresistant + natural_death_resistant
 
-        if i == 170 or i == 545:
-            i_r[i] = 80
+        if (i - 125) % 365 == 0 and i_r[i] == 0:
+            i_r[i] = 20
+            print(i)
 
         # - Humans
         N_h = s_h + i_h[i - 1] + r_h[i - 1]
@@ -218,4 +210,4 @@ if __name__ == "__main__":
     # mc = mf.GaussianWalk(10, run, beta_h, sus_frac, beta_r, i_r0)
     # mc.start()
     # 0.975
-    run(.1, .12, .08, 0., 0.999)
+    run(.1, .12, .08, 0., 0.8)
