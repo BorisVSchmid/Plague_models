@@ -10,9 +10,6 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
     title = "Plague model"
     start_year = 1980
     end_year = 2010
-    md = []
-    with open("sim_md.csv", mode='r') as file:
-        [md.append(float(a)) for a in file.read().split(', ')]
     years = mdates.YearLocator()  # every year
     months = mdates.MonthLocator()  # every month
     yearsFmt = mdates.DateFormatter('%Y')
@@ -76,7 +73,7 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         temps = data[v.strftime("%Y-%m-%d")]
         temp = temps[0]
         temp_data[i] = temp
-        temp_fac = ((temp - 18)/((14/3)*4)) + (1 / 4)
+        temp_fac = (temp - 15)/10
         # + rec_r[i - 1]
         N_r = s_r[i - 1] + i_r[i - 1] + res_r[i - 1]
 
@@ -104,7 +101,7 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         # number of fleas that find a rat
         force_to_rats = i_f[i - 1] - force_to_humans
         force_to_rats = force_to_rats * (0.75 - 0.25 * np.tanh(((temp * 9/5) + 32) - 80))
-        force_to_humans = force_to_humans * (0.75 - 0.25 * np.tanh(((temp * 9/5) + 32) - 80))
+        force_to_humans = force_to_humans * 0.9 * (0.75 - 0.25 * np.tanh(((temp * 9/5) + 32) - 80))
         fph[i] = fph[i - 1] + flea_growth
         # should add dehydration
         i_f[i] = i_f[i - 1] + new_infectious - starvation_deaths
@@ -120,7 +117,7 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         # born rats
         pressure = N_r / (s_h * sus_frac)
         resistant_born_rats = rep_rate_r * res_r[i - 1] * (inh_res - pressure)
-        unresistant_born_rats = rep_rate_ur * ((res_r[i - 1] * (1 - inh_res)) + (s_r[i - 1] * (1 - pressure)))
+        unresistant_born_rats = ((rep_rate_r * res_r[i - 1] * (1 - inh_res)) + (rep_rate_ur * s_r[i - 1] * (1 - pressure)))
 
         # rec
 
@@ -129,15 +126,14 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         s_r[i] = min(s_h * sus_frac, s_r[i - 1] + unresistant_born_rats - new_infected_rats - natural_death_unresistant)
         i_r[i] = i_r[i - 1] + new_infected_rats - new_removed_rats - natural_death_infected
         res_r[i] = res_r[i - 1] + new_recovered_rats + resistant_born_rats - natural_death_resistant
-        d_r[i] = new_dead_rats + natural_death_unresistant + natural_death_resistant
+        d_r[i] = new_dead_rats + natural_death_unresistant + natural_death_resistant + natural_death_infected
 
         if (i - 125) % 365 == 0 and i_r[i] == 0:
             i_r[i] = 20
-            print(i)
 
         # - Humans
-        N_h = s_h + i_h[i - 1] + r_h[i - 1]
-        new_infected_humans = min(s_h, beta_h * s_h * force_to_humans / N_h)
+        N_h = s_h - i_h[i - 1] - r_h[i - 1]
+        new_infected_humans = min(s_h, beta_h * N_h * force_to_humans / s_h)
         new_removed_humans = gamma_h * i_h[i - 1]
         new_recovered_humans = p_recovery_h * new_removed_humans
         new_dead_humans = new_removed_humans - new_recovered_humans
@@ -147,58 +143,56 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         r_h[i] = r_h[i - 1] + new_recovered_humans
         d_h[i] = new_dead_humans + 0.0000001
 
-    md = np.asarray(md, dtype=float)
+    with open('../sim_md.csv', mode='w') as file:
+        file.write(", ".join([str(a) for a in d_h.tolist()]) + '\n')
 
     # Likelihood
     #mortality = pm.Poisson('mortality', mu=d_h, value=md, observed=True)
     #mortality_sim = pm.Poisson('mortality_sim', mu=d_h)
     # return mortality.logp
 
-    fig, ax = plt.subplots()
-
-    # plot the data
-    ax.plot(years_list, d_r, label='dead_rats')
-    ax.plot(years_list, s_r, label='susceptible rats')
-    ax.plot(years_list, i_r, label="infected rats")
-    ax.plot(years_list, res_r, label="resistant rats")
-    ax.plot(years_list, d_h, label="I see dead people")
-    # ax.plot(years_list, temp_data, label="temperature data")
-
-    # format the ticks
-    ax.xaxis.set_major_locator(years)
-    ax.xaxis.set_major_formatter(yearsFmt)
-    ax.xaxis.set_minor_locator(months)
-
-    # set the axis limit
-    datemin = min(years_list)
-    datemax = max(years_list) + 1
-    ax.set_xlim(datemin, datemax)
-
-    # format the coords message box
-    def price(x):
-        return '$%1.2f' % x
-    ax.format_xdata = mdates.DateFormatter('%Y-%m-%d')
-    ax.format_ydata = price
-    ax.grid(True)
-
-    # rotates and right aligns the x labels, and moves the bottom of the
-    # axes up to make room for them
-    fig.autofmt_xdate()
-
-    # some extra plot formating
-    ax.legend(loc='best')
-    plt.style.use('ggplot')
-    plt.rc('font', size=16)
-    plt.rc('lines', linewidth=2)
-    plt.rc('figure', autolayout=True)
-    plt.title(title)
-    plt.xlabel('time in years')
-    plt.ylabel('number of rats')
-    plt.show()
-    # plt.savefig('SIRD_model.png')
-
-    # with open('sim_md.csv', mode='a') as file:
-    #     file.write(", ".join([str(a) for a in d_h.tolist()]) + '\n')
+    # fig, ax = plt.subplots()
+    #
+    # # plot the data
+    # ax.plot(years_list, d_r, label='dead_rats')
+    # ax.plot(years_list, s_r, label='susceptible rats')
+    # ax.plot(years_list, i_r, label="infected rats")
+    # ax.plot(years_list, res_r, label="resistant rats")
+    # ax.plot(years_list, d_h, label="I see dead people")
+    # # ax.plot(years_list, temp_data, label="temperature data")
+    #
+    # # format the ticks
+    # ax.xaxis.set_major_locator(years)
+    # ax.xaxis.set_major_formatter(yearsFmt)
+    # ax.xaxis.set_minor_locator(months)
+    #
+    # # set the axis limit
+    # datemin = min(years_list)
+    # datemax = max(years_list) + 1
+    # ax.set_xlim(datemin, datemax)
+    #
+    # # format the coords message box
+    # def price(x):
+    #     return '$%1.2f' % x
+    # ax.format_xdata = mdates.DateFormatter('%Y-%m-%d')
+    # ax.format_ydata = price
+    # ax.grid(True)
+    #
+    # # rotates and right aligns the x labels, and moves the bottom of the
+    # # axes up to make room for them
+    # fig.autofmt_xdate()
+    #
+    # # some extra plot formating
+    # ax.legend(loc='best')
+    # plt.style.use('ggplot')
+    # plt.rc('font', size=16)
+    # plt.rc('lines', linewidth=2)
+    # plt.rc('figure', autolayout=True)
+    # plt.title(title)
+    # plt.xlabel('time in years')
+    # plt.ylabel('number of rats')
+    # plt.show()
+    # # plt.savefig('SIRD_model.png')
 
 
 if __name__ == "__main__":
@@ -210,4 +204,4 @@ if __name__ == "__main__":
     # mc = mf.GaussianWalk(10, run, beta_h, sus_frac, beta_r, i_r0)
     # mc.start()
     # 0.975
-    run(.1, .12, .08, 0., 0.8)
+    run(.99, .1189, .078, 0., 0.78)

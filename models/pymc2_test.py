@@ -4,7 +4,7 @@ import numpy as np
 
 __all__ = ['md', 'beta', 's_h', 'gamma_h', 'p_recovery_h', 'fraction', 'sigma', 'i_r0', 's_r0', 'gamma_r',
            'p_recovery_ur', 'rep_rate_r', 'rep_rate_ur', 'inh_res', 'd_rate_ui', 'd_rate', 'g_rate', 'c_cap',
-           'fph0', 'searching', 'd_', 'mortality', 'mortality_sim']
+           'fph0', 'searching', 'd', 'mortality', 'mortalitysim']
 
 md = np.array(map(float, open('sim_md.csv', 'r').read().split(', ')), dtype=float)
 decade = {key: [float(y) for y in value.split(", ")] for (key, value) in map(lambda x: x.split(' : '), open('time.date').readlines())}
@@ -131,8 +131,8 @@ def plague_model(s_r0=s_r0, res_r0=res_r0, i_r0=i_r0, fph0=fph0, beta=beta, frac
     return i_h, r_h, d_h, s_r, i_r, res_r, d_r, i_f, fph
 
 
-d_ = pm.Lambda('d_', lambda plague_model=plague_model: plague_model[2])
+d = pm.Lambda('d', lambda plague_model=plague_model: plague_model[2])
 
 #Likelihood
-mortality = pm.Poisson('mortality', mu=d_, value=md, observed=True)
-mortality_sim = pm.Poisson('mortality_sim', mu=d_)
+mortality = pm.Poisson('mortality', mu=d, value=md, observed=True)
+mortality_sim = pm.Poisson('mortalitysim', mu=d)
