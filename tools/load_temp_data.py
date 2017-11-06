@@ -3,12 +3,15 @@ import pandas as pd
 from datetime import date
 import netCDF4 as nc
 from os.path import dirname, abspath
+import os.path
+
 
 
 class TempReader:
 
     def __init__(self):
-        self.fname = "C:\\Users\\rolfve\\PycharmProjects\\Plague_models\\data\\temp_data.csv"
+        self.parent_dir = dirname(dirname(abspath(__file__)))
+        self.fname = os.path.join(self.parent_dir, 'data', 'temp_data.csv')
         self.temp_dict = {}
         self.temp_list = []
         
@@ -23,9 +26,9 @@ class TempReader:
 
 class TempLoader:
 
-    def __init__(self, start=1991, end=1999, update=False, floc="PycharmProjects\\Plague_models\\", fname="1107903"):
-        self.loc = "C:\\Users\\rolfve\\" + floc + "\\" + fname + ".csv"
+    def __init__(self, start=1991, end=1999, update=False, fname="1107903"):
         self.parent_dir = dirname(dirname(abspath(__file__)))
+        self.loc = os.path.join(self.parent_dir, fname + ".csv")
         self.start = start
         self.end = end
         self.update = bool(update)
@@ -99,7 +102,7 @@ class TempLoader:
         return self.template_temps, self.temp_list
 
     def update_data(self):
-        with open(self.parent_dir + "\\data\\temp_data.csv", 'w') as file:
+        with open(os.path.join(self.parent_dir, "data", "temp_data.csv"), 'w') as file:
             for n, i in enumerate(self.years_range):
                 offset = (1991 - self.start)*365
                 if n >= offset + 273 and n <= offset + 396:
@@ -109,10 +112,10 @@ class TempLoader:
                 self.temp_list.append(self.template_temps[i.strftime("%Y-%m-%d")][0])
 
     def fill_holes(self):
-        tmax_1991_data = nc.Dataset(self.parent_dir + '\\data\\tmax.1991.nc', 'r')
-        tmin_1991_data = nc.Dataset(self.parent_dir + '\\data\\tmin.1991.nc', 'r')
-        tmax_1992_data = nc.Dataset(self.parent_dir + '\\data\\tmax.1992.nc', 'r')
-        tmin_1992_data = nc.Dataset(self.parent_dir + '\\data\\tmin.1992.nc', 'r')
+        tmax_1991_data = nc.Dataset(os.path.join(self.parent_dir, 'data', 'tmax.1991.nc'), 'r')
+        tmin_1991_data = nc.Dataset(os.path.join(self.parent_dir, 'data', 'tmin.1991.nc'), 'r')
+        tmax_1992_data = nc.Dataset(os.path.join(self.parent_dir, 'data', 'tmax.1992.nc'), 'r')
+        tmin_1992_data = nc.Dataset(os.path.join(self.parent_dir, 'data', 'tmin.1992.nc'), 'r')
         tmaxs_1991 = tmax_1991_data.variables['tmax'][273:]
         tmins_1991 = tmin_1991_data.variables['tmin'][273:]
         tmaxs_1992 = tmax_1992_data.variables['tmax'][:32]
