@@ -5,6 +5,7 @@ import pandas as pd
 from datetime import date
 from tools.load_temp_data import TempReader
 from os.path import dirname, abspath
+import os.path
 
 
 __all__ = ['md', 'sigma', 'beta', 'gamma_h', 'p_recovery_h', 'phi', 'rho', 'gamma_r', 'p_recovery_ur',
@@ -13,7 +14,7 @@ __all__ = ['md', 'sigma', 'beta', 'gamma_h', 'p_recovery_h', 'phi', 'rho', 'gamm
 d = dirname(dirname(abspath(__file__)))
 start_year = 1980
 end_year = 2010
-md = np.array(list(map(float, open(d + '\\data\\sim_md.csv', 'r').read().split(', '))), dtype=float)
+md = np.array(list(map(float, open(os.path.join(d, 'data', 'sim_md.csv'), 'r').read().split(', '))), dtype=float)
 years_list = pd.date_range(date(start_year, 1, 1), date(end_year, 12, 31)).tolist()
 # -- Params
 data, temp_list = TempReader().cooked()
