@@ -9,16 +9,16 @@ import matplotlib.dates as mdates
 
 if __name__ == "__main__":
     title = "Plague model"
-    years_list = pd.date_range(date(1980, 1, 1), date(2010, 12, 31)).tolist()
+    years_list = pd.date_range(date(1991, 1, 1), date(1991, 12, 31)).tolist()
     years = mdates.YearLocator()  # every year
     months = mdates.MonthLocator()  # every month
     yearsFmt = mdates.DateFormatter('%Y')
-    vars = ['md', 'sigma', 'beta', 'gamma_h', 'p_recovery_h', 'phi', 'rho', 'gamma_r', 'p_recovery_ur',
-           'rep_rate_r', 'rep_rate_ur', 'iota', 'd_rate_ui', 'd_rate', 'g_rate', 'c_cap', 'searching', 'd',
-           'mortality', 'mortalitysim']
-    mc = pm.MCMC(vars)
+    vars = [md, sigma, beta, gamma_h, p_recovery_h, phi, rho, gamma_r, p_recovery_ur,
+           rep_rate_r, rep_rate_ur, iota, d_rate_ui, d_rate, g_rate, c_cap, searching, d,
+           mortality, mortalitysim]
+    mc = pm.MCMC(vars, db='hdf5', dbname='ratflea.hdf5')
     mc.use_step_method(pm.AdaptiveMetropolis, [sigma, beta, phi, rho, iota])
-    mc.sample(iter=8000, verbose=4)
+    mc.sample(iter=4, verbose=4)
     mc.summary()
     M = pm.MAP(mc)
     print('fit')

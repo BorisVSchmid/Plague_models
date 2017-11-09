@@ -1,5 +1,5 @@
 """This model is the rat flea human with seasonality model made to be fitted against mortality data"""
-import pymc as pm
+import elfi
 import numpy as np
 import pandas as pd
 from datetime import date
@@ -8,51 +8,43 @@ from os.path import dirname, abspath
 import os.path
 
 
-__all__ = ['md', 'sigma', 'beta', 'gamma_h', 'p_recovery_h', 'phi', 'rho', 'gamma_r', 'p_recovery_ur',
-           'rep_rate_r', 'rep_rate_ur', 'iota', 'd_rate_ui', 'd_rate', 'g_rate', 'c_cap', 'searching', 'd',
-           'mortality', 'mortalitysim']
-dir = dirname(dirname(abspath(__file__)))
-start_year = 1991
-end_year = 1991
-md = np.array(list(map(float, open(os.path.join(dir, 'data', 'sim_md1.csv'), 'r').read().split(', '))), dtype=float)
-years_list = pd.date_range(date(start_year, 1, 1), date(end_year, 12, 31)).tolist()
-# -- Params
-data, temp_list = TempReader().cooked()
-t = len(data)
-# - human
-sigma = pm.Uniform('sigma', 15000.0, 45000.0, value=30000)
-beta = pm.Uniform('beta', 0.1, .3, value=0.2)
-# .2
-gamma_h = 0.1
-p_recovery_h = .4
-# - rat
-res_r0 = 0.
-# .08
-phi = pm.Uniform('phi', 0.01, 1.0, value=.12)
-# 0.08
-rho = pm.Uniform('rho', 1e-3, .2, value=0.1)
-# .2
-gamma_r = 0.2
-# .1
-p_recovery_ur = .1
-rep_rate_r = .4 * (1 - 0.234)
-rep_rate_ur = .4
-iota = pm.Uniform('iota', 0.5, 0.975, value=0.8)
-d_rate_ui = 1 / (365 * 1)
-# - flea
-d_rate = 0.2
-# 0.2
-g_rate = .0084
-c_cap = 6.
-searching = 3. / ((sigma * phi) - 20 + res_r0)
 # -- Simulate
-@pm.deterministic
-def plague_model(s_h=sigma, beta_h=beta, sus_frac=phi, beta_r=rho, inh_res=iota):
+def plague_model(s_h, beta_h, sus_frac, beta_r, inh_res, batch_size=1, random_state=None):
+    dir = dirname(dirname(abspath(__file__)))
+    # time span
+    start_year = 1991
+    end_year = 1991
+    md = np.array(list(map(float, open(os.path.join(dir, 'data', 'sim_md1.csv'), 'r').read().split(', '))), dtype=float)
+    years_list = pd.date_range(date(start_year, 1, 1), date(end_year, 12, 31)).tolist()
+    # -- Params
+    data, temp_list = TempReader().cooked()
+    t = len(data)
+    # - human
+    # .2
+    gamma_h = 0.1
+    p_recovery_h = .4
+    # - rat
+    res_r0 = 0.
+    # .08
+    # 0.08
+    # .2
+    gamma_r = 0.2
+    # .1
+    p_recovery_ur = .1
+    rep_rate_r = .4 * (1 - 0.234)
+    rep_rate_ur = .4
+    d_rate_ui = 1 / (365 * 1)
+    # - flea
+    d_rate = 0.2
+    # 0.2
+    g_rate = .0084
+    c_cap = 6.
+    searching = 3. / ((s_h[:] * sus_frac[:]) - 20 + res_r0)
     #human
-    i_h = np.zeros(t, dtype=float)
+    i_h = np.asanyarray(np.zeros(t, dtype=float))
     r_h = np.zeros(t, dtype=float)
     d_h = np.zeros(t, dtype=float)
-    d_h[0] = float(0.0000001)
+    d_h[0] = 0.0000001
     i_h[0] = 2
     # rat
     s_r = np.zeros(t, dtype=float)
@@ -134,9 +126,14 @@ def plague_model(s_h=sigma, beta_h=beta, sus_frac=phi, beta_r=rho, inh_res=iota)
         i_h[i] = i_h[i - 1] + new_infected_humans - new_removed_humans
         r_h[i] = r_h[i - 1] + new_recovered_humans
         d_h[i] = new_dead_humans + 0.0000001
-    return i_h, r_h, d_h, s_r, i_r, res_r, d_r, i_f, fph
+    return d_h
 
-# Likelihood
-d = pm.Lambda('d', lambda plague_model=plague_model: plague_model[2])
-mortality = pm.Poisson('mortality', mu=d, value=md, observed=True)
-mortalitysim = pm.Poisson('mortalitysim', mu=d)
+
+if __name__ == '__main__':
+    s_h = elfi.Prior('uniform', 15000.0, 30000.0)
+    beta_h = elfi.Prior('uniform', 0.1, .2)
+    sus_frac = elfi.Prior('uniform', 0.01, 0.99)
+    beta_r = elfi.Prior('uniform', 1e-3, .199)
+    inh_res = elfi.Prior('uniform', 0.5, 0.475)
+
+

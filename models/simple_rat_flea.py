@@ -2,14 +2,14 @@ import numpy as np
 import pandas as pd
 from datetime import date
 import matplotlib.dates as mdates
-from tools.load_temp_data import TempReader
+from tools.TempReader import TempReader
 import matplotlib.pyplot as plt
 
 
 def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
     title = "Plague model"
-    start_year = 1980
-    end_year = 2010
+    start_year = 1991
+    end_year = 1991
     years = mdates.YearLocator()  # every year
     months = mdates.MonthLocator()  # every month
     yearsFmt = mdates.DateFormatter('%Y')
@@ -128,7 +128,8 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         res_r[i] = res_r[i - 1] + new_recovered_rats + resistant_born_rats - natural_death_resistant
         d_r[i] = new_dead_rats + natural_death_unresistant + natural_death_resistant + natural_death_infected
 
-        if (i - 125) % 365 == 0 and i_r[i] == 0:
+        #if (i - 125) % 365 == 0 and i_r[i] == 0:
+        if i == 125:
             i_r[i] = 20
 
         # - Humans
@@ -143,7 +144,7 @@ def run(beta_h, sus_frac, beta_r, i_r0, inh_res):
         r_h[i] = r_h[i - 1] + new_recovered_humans
         d_h[i] = new_dead_humans + 0.0000001
 
-    with open('../sim_md.csv', mode='w') as file:
+    with open('../data/sim_md1.csv', mode='w') as file:
         file.write(", ".join([str(a) for a in d_h.tolist()]) + '\n')
 
     # Likelihood
