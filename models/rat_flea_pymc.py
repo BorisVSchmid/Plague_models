@@ -8,8 +8,8 @@ from os.path import dirname, abspath
 import os.path
 
 
-__all__ = ['confirmed_cases', 'sigma', 'beta', 'gamma_h', 'p_recovery_h', 'phi', 'rho', 'gamma_r', 'p_recovery_ur', 'rep_rate_r',
-           'rep_rate_ur', 'iota', 'theta', 'epsilon', 'd_rate_ui', 'd_rate', 'g_rate', 'c_cap', 'sim_data', 'mortality', 'mortalitysim']
+__all__ = ['confirmed_cases', 'kappa', 'beta', 'gamma_h', 'p_recovery_h', 'phi', 'rho', 'gamma_r', 'p_recovery_ur', 'rep_rate_r',
+           'rep_rate_ur', 'iota', 'd_rate_ui', 'd_rate', 'g_rate', 'c_cap', 'sim_data', 'mortality', 'mortalitysim']
 dir = dirname(dirname(abspath(__file__)))
 start_year = 1995
 end_year = 1999
@@ -21,14 +21,14 @@ years_list = pd.date_range(date(start_year, 1, 1), date(end_year, 7, 1)).tolist(
 data, temp_list = TempReader().cooked()
 t = len(data)
 # - human
-sigma = pm.Uniform('sigma', 10000.0, 30000.0, value=20000)
-beta = pm.Uniform('beta', 0.001, 1.0, value=0.01)
+kappa = pm.Uniform('kappa', 2000, 10000.0, value=3500)
+beta = pm.Uniform('beta', 0.0001, 1.0, value=0.01)
 # .2
 gamma_h = 0.1
 p_recovery_h = .4
 # - rat
 # .08
-phi = pm.Uniform('phi', 0.01, 1.0, value=.12)
+phi = pm.Uniform('phi', 0.8, 1.2, value=1.0)
 # 0.08
 rho = pm.Uniform('rho', 1e-3, .2, value=0.1)
 # .2
@@ -37,9 +37,8 @@ gamma_r = 0.2
 p_recovery_ur = .1
 rep_rate_r = .4 * (1 - 0.234)
 rep_rate_ur = .4
-iota = pm.Uniform('iota', 0.5, 0.975, value=0.8)
-theta = pm.Uniform('theta', 15, 25, value=18)
-d_rate_ui = 1 / (365 * 1)
+iota = pm.Uniform('iota', 0.7, 1.0, value=0.8)
+d_rate_ui = 1 / 365
 # - flea
 d_rate = 0.2
 # 0.2
@@ -47,8 +46,9 @@ g_rate = .0084
 c_cap = 6.
 # -- Simulate
 @pm.deterministic
-def plague_model(s_h=sigma, beta_h=beta, sus_frac=phi, beta_r=rho, inh_res=iota, i_r0=theta):
+def plague_model(rat_pop=kappa, beta_h=beta, temp_scale=phi, beta_r=rho, inh_res=iota):
     #human
+    s_h = 25000
     i_h = np.zeros(t, dtype=float)
     i_n = np.zeros(len(confirmed_cases), dtype=float)
     r_h = np.zeros(t, dtype=float)
@@ -60,11 +60,10 @@ def plague_model(s_h=sigma, beta_h=beta, sus_frac=phi, beta_r=rho, inh_res=iota,
     i_r = np.zeros(t, dtype=float)
     res_r = np.zeros(t, dtype=float)
     d_r = np.zeros(t, dtype=float)
-    s_r[0] = (s_h * sus_frac) - 20
+    s_r[0] = rat_pop - 20
     res_r[0] = 0.
-    i_r[0] = i_r0
     # flea
-    searching = 3. / ((s_h * sus_frac) - 20)
+    searching = 3. / (rat_pop - 20)
     i_f = np.zeros(t, dtype=float)
     fph = np.zeros(t, dtype=float)
     fph[0] = c_cap
@@ -72,7 +71,7 @@ def plague_model(s_h=sigma, beta_h=beta, sus_frac=phi, beta_r=rho, inh_res=iota,
     month = 1
     for i, v in enumerate(years_list[1:], 1):
         date_string = v.strftime("%Y-%m-%d")
-        temp = data[date_string][0]
+        temp = data[date_string][0] * temp_scale
         temp_fac = (temp - 15) / 10
         # + rec_r[i - 1]
         N_r = s_r[i - 1] + i_r[i - 1] + res_r[i - 1]
@@ -112,12 +111,12 @@ def plague_model(s_h=sigma, beta_h=beta, sus_frac=phi, beta_r=rho, inh_res=iota,
         infected_rat_deaths = new_dead_rats
 
         # born rats
-        pressure = N_r / (s_h * sus_frac)
+        pressure = N_r / rat_pop
         resistant_born_rats = rep_rate_r * res_r[i - 1] * (inh_res - pressure)
         unresistant_born_rats = ((rep_rate_r * res_r[i - 1] * (1 - inh_res)) + (rep_rate_ur * s_r[i - 1] * (1 - pressure)))
 
         # time step values
-        s_r[i] = min(s_h * sus_frac, s_r[i - 1] + unresistant_born_rats - new_infected_rats - natural_death_unresistant)
+        s_r[i] = min(rat_pop, s_r[i - 1] + unresistant_born_rats - new_infected_rats - natural_death_unresistant)
         i_r[i] = i_r[i - 1] + new_infected_rats - new_removed_rats - natural_death_infected
         res_r[i] = res_r[i - 1] + new_recovered_rats + resistant_born_rats - natural_death_resistant
         d_r[i] = new_dead_rats + natural_death_unresistant + natural_death_resistant + natural_death_infected
@@ -130,7 +129,7 @@ def plague_model(s_h=sigma, beta_h=beta, sus_frac=phi, beta_r=rho, inh_res=iota,
         new_dead_humans = new_removed_humans - new_recovered_humans
 
         if i == 50:
-            i_r[i] = theta
+            i_r[i] = 20
         # time step values
         i_h[i] = i_h[i - 1] + new_infected_humans - new_removed_humans
         r_h[i] = r_h[i - 1] + new_recovered_humans

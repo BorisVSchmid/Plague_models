@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 
 
 if __name__ == "__main__":
-    vars = [confirmed_cases, sigma, beta, gamma_h, p_recovery_h, phi, rho, gamma_r, p_recovery_ur, rep_rate_r,
-            rep_rate_ur, iota, theta, epsilon, d_rate_ui, d_rate, g_rate, c_cap, sim_data, mortality, mortalitysim]
+    vars = [confirmed_cases, kappa, beta, gamma_h, p_recovery_h, phi, rho, gamma_r, p_recovery_ur, rep_rate_r,
+            rep_rate_ur, iota, d_rate_ui, d_rate, g_rate, c_cap, sim_data, mortality, mortalitysim]
     mc = pm.MCMC(vars, db='pickle', dbname="rat.pickle")
-    mc.use_step_method(pm.AdaptiveMetropolis, [sigma, beta, phi, rho, iota, theta, epsilon])
-    mc.sample(iter=100000, burn=50000, thin=10, verbose=1)
+    mc.use_step_method(pm.AdaptiveMetropolis, [kappa, beta, phi, rho, iota])
+    mc.sample(iter=70000, burn=35000, thin=10, verbose=1)
     mc.summary()
     # load db back
     # db = pm.database.pickle.load('rat.pickle')
