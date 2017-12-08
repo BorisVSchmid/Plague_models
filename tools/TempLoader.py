@@ -7,7 +7,6 @@ import os.path
 
 
 class TempLoader:
-
     def __init__(self, start=1991, end=1999, update=False, fname="1107903"):
         self.parent_dir = dirname(dirname(abspath(__file__)))
         self.loc = os.path.join(self.parent_dir, fname + ".csv")
@@ -50,12 +49,14 @@ class TempLoader:
                     month = int(month)
                     day = int(day)
                     temp = float(data[3])
-                    if year >= self.start and year <= self.end:
+                    if self.start <= year <= self.end:
                         if day != prev_day and day - prev_day > 1:
                             span = day - prev_day - 1
                             if span == 1:
                                 s_temp = (temp + prev_temp) / 2
-                                self.template_temps["{}-{}-{}".format(year, TempLoader.str_int(month), TempLoader.str_int(prev_day + 1))][0] = round(s_temp, 2)
+                                self.template_temps["{}-{}-{}".format(year, TempLoader.str_int(month),
+                                                                      TempLoader.str_int(prev_day + 1))
+                                                    ][0] = round(s_temp, 2)
                             else:
                                 if temp != prev_temp:
                                     s_temp = (temp - prev_temp) / span
@@ -78,7 +79,7 @@ class TempLoader:
             self.update_data()
         else:
             for n, i in enumerate(self.years_range):
-                if n >= 273 and n <= 396:
+                if 273 <= n <= 396:
                     self.template_temps[i.strftime("%Y-%m-%d")][0] = self.temp_missing[n - 273]
                 self.temp_list.append(self.template_temps[i.strftime("%Y-%m-%d")][0])
         return self.template_temps, self.temp_list
@@ -86,11 +87,12 @@ class TempLoader:
     def update_data(self):
         with open(os.path.join(self.parent_dir, "data", "temp_data.csv"), 'w') as file:
             for n, i in enumerate(self.years_range):
-                offset = (1991 - self.start)*365
-                if n >= offset + 273 and n <= offset + 396:
+                offset = (1991 - self.start) * 365
+                if offset + 273 <= n <= offset + 396:
                     self.template_temps[i.strftime("%Y-%m-%d")][0] = self.temp_missing[n - (offset + 273)]
                 file.write(i.strftime("%Y-%m-%d") + ":{},{}".format(self.template_temps[i.strftime("%Y-%m-%d")][0],
-                                                                    self.template_temps[i.strftime("%Y-%m-%d")][1]) + "\n")
+                                                                    self.template_temps[i.strftime("%Y-%m-%d")][1]) +
+                           "\n")
                 self.temp_list.append(self.template_temps[i.strftime("%Y-%m-%d")][0])
 
     def fill_holes(self):

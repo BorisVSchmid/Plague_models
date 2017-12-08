@@ -6,22 +6,22 @@ from datetime import date
 from tools.TempReader import TempReader
 
 
-__all__ = ['confirmed_cases', 'rat_pop', 'beta_h', 'gamma_h', 'p_recovery_h', 'temp_scale', 'beta_r', 'gamma_r', 'p_recovery_ur',
-           'rep_rate_r', 'rep_rate_ur', 'inh_res', 'd_rate_ui', 'd_rate', 'g_rate', 'c_cap', 'sim_data', 'mortality',
-           'mortalitysim', 'years_list', 'months_list']
+__all__ = ['confirmed_cases', 'rat_pop', 'beta_h', 'gamma_h', 'p_recovery_h', 'temp_scale', 'beta_r', 'gamma_r',
+           'p_recovery_ur', 'rep_rate_r', 'rep_rate_ur', 'inh_res', 'd_rate_ui', 'd_rate', 'g_rate', 'c_cap',
+           'sim_data', 'mortality', 'mortalitysim', 'years_list', 'months_list']
 start = [1995, 7, 1]
 end = [1999, 7, 1]
 # confirmed_cases = [52.0, 78.0, 403.0, 104.0, 13.0, 91.0]
-confirmed_cases = [52.0, 78.0, 403.0, 104.0, 13.0, 91.0, 36.0, 30.0, 0.0, 0.0, 0.0, 0.0, 6.0, 30.0, 132.0, 234.0,
-                    66.0, 48.0, 15.0, 18.0, 6.0, 3.0, 0.0, 0.0, 30.0, 114.0, 177.0, 222.0, 39.0, 18.0, 3.0, 3.0, 0.0,
-                    0.0, 0.0, 0.0, 12.0, 51.0, 54.0, 87.0, 27.0, 24.0, 24.0, 24.0, 8.0, 0.0, 8.0, 0.0]
+confirmed_cases = [52.0, 78.0, 403.0, 104.0, 13.0, 91.0, 36.0, 30.0, 0.0, 0.0, 0.0, 0.0, 6.0, 30.0, 132.0, 234.0, 66.0,
+                   48.0, 15.0, 18.0, 6.0, 3.0, 0.0, 0.0, 30.0, 114.0, 177.0, 222.0, 39.0, 18.0, 3.0, 3.0, 0.0, 0.0, 0.0,
+                   0.0, 12.0, 51.0, 54.0, 87.0, 27.0, 24.0, 24.0, 24.0, 8.0, 0.0, 8.0, 0.0]
 # 1995 0, 0, 1, 0, 2, 0, 8, 12, 62, 16, 2, 14
 # 1996 6, 5, 0, 0, 0, 0, 1, 5, 22, 39, 11, 8
 # 1997 5, 6, 2, 1, 0, 0, 10, 38, 59, 74, 13, 6
 # 1998 1, 1, 0, 0, 0, 0, 4, 17, 18, 29, 9, 8
 # 1999 3, 3, 1, 0, 1, 0
-# confirmed_cases = [0, 0, 1, 0, 2, 0, 8, 12, 62, 16, 2, 14, 6, 5, 0, 0, 0, 0, 1, 5, 22, 39, 11, 8, 5, 6, 2, 1, 0, 0, 10, 38, 59, 74,
-#                    13, 6, 1, 1, 0, 0, 0, 0, 4, 17, 18, 29, 9, 8, 3, 3, 1, 0, 1, 0]
+# confirmed_cases = [0, 0, 1, 0, 2, 0, 8, 12, 62, 16, 2, 14, 6, 5, 0, 0, 0, 0, 1, 5, 22, 39, 11, 8, 5, 6, 2, 1, 0, 0,
+#                    10, 38, 59, 74, 13, 6, 1, 1, 0, 0, 0, 0, 4, 17, 18, 29, 9, 8, 3, 3, 1, 0, 1, 0]
 years_list = pd.date_range(date(start[0], start[1], start[2]), date(end[0], end[1], end[2])).tolist()
 months_list = pd.date_range(date(start[0], start[1], start[2]), date(end[0], end[1], end[2]), freq='M').tolist()
 # -- Params
@@ -54,11 +54,13 @@ c_cap = 6.
 # shrews
 shrew_pop = 12000.
 i_rpd = 2.
+
+
 # -- Simulate
 @pm.deterministic
 def plague_model(rat_pop=rat_pop, beta_h=beta_h, temp_scale=temp_scale, beta_r=beta_r, inh_res=inh_res):
-    #human
-    N_h = 25000.
+    # human
+    n_h = 25000.
     i_h = np.zeros(t, dtype=float)
     i_n = np.zeros(len(confirmed_cases), dtype=float)
     r_h = np.zeros(t, dtype=float)
@@ -89,7 +91,7 @@ def plague_model(rat_pop=rat_pop, beta_h=beta_h, temp_scale=temp_scale, beta_r=b
         temp = data[date_string][0] * temp_scale
         temp_fac = (temp - 15.) / 10.
         # + rec_r[i - 1]
-        N_r = s_r[i - 1] + i_r[i - 1] + res_r[i - 1]
+        n_r = s_r[i - 1] + i_r[i - 1] + res_r[i - 1]
         # natural deaths
         natural_death_unresistant = (s_r[i - 1] * d_rate_ui)
         natural_death_resistant = (res_r[i - 1] * d_rate_ui)
@@ -104,11 +106,11 @@ def plague_model(rat_pop=rat_pop, beta_h=beta_h, temp_scale=temp_scale, beta_r=b
         else:
             flea_growth = 0.
 
-        new_infectious = (infected_rat_deaths) * fph[i - 1]
+        new_infectious = infected_rat_deaths * fph[i - 1]
         # could be made temperature dependent
         starvation_deaths = d_rate * i_f[i - 1]
         # number of fleas that find a human
-        force_to_humans = min(i_f[i - 1], i_f[i - 1] * np.exp(float(-searching * N_r)))
+        force_to_humans = min(i_f[i - 1], i_f[i - 1] * np.exp(float(-searching * n_r)))
         # number of fleas that find a rat
         force_to_rats = i_f[i - 1] - force_to_humans
         force_to_rats = force_to_rats * (0.75 - 0.25 * np.tanh(((temp * 9. / 5.) + 32.) - 80.))
@@ -118,7 +120,7 @@ def plague_model(rat_pop=rat_pop, beta_h=beta_h, temp_scale=temp_scale, beta_r=b
         i_f[i] = max(0.0, i_f[i - 1] + new_infectious - starvation_deaths)
 
         # - Rats
-        new_infected_rats = beta_r * s_r[i - 1] * force_to_rats / N_r
+        new_infected_rats = beta_r * s_r[i - 1] * force_to_rats / n_r
         new_infected_rats = 0 if new_infected_rats < 0 else new_infected_rats
         new_removed_rats = gamma_r * (i_r[i - 1] - natural_death_infected)
         new_recovered_rats = p_recovery_ur * new_removed_rats
@@ -126,19 +128,21 @@ def plague_model(rat_pop=rat_pop, beta_h=beta_h, temp_scale=temp_scale, beta_r=b
         infected_rat_deaths = new_dead_rats
 
         # born rats
-        pressure = N_r / rat_pop
+        pressure = n_r / rat_pop
         resistant_born_rats = max(0, rep_rate_r * res_r[i - 1] * (inh_res - pressure))
-        unresistant_born_rats = max(0, (rep_rate_r * res_r[i - 1] * (1 - inh_res)) + (rep_rate_ur * s_r[i - 1] * (1 - pressure)))
+        unresistant_born_rats = max(0, (rep_rate_r * res_r[i - 1] * (1 - inh_res)) + (rep_rate_ur * s_r[i - 1]
+                                    * (1 - pressure)))
 
         # time step values
-        s_r[i] = min(rat_pop, s_r[i - 1] + unresistant_born_rats - new_infected_rats - natural_death_unresistant - shrew_transference)
+        s_r[i] = min(rat_pop, s_r[i - 1] + unresistant_born_rats - new_infected_rats - natural_death_unresistant
+                     - shrew_transference)
         i_r[i] = i_r[i - 1] + new_infected_rats - new_removed_rats - natural_death_infected + shrew_transference
         res_r[i] = res_r[i - 1] + new_recovered_rats + resistant_born_rats - natural_death_resistant
         d_r[i] = new_dead_rats + natural_death_unresistant + natural_death_resistant + natural_death_infected
 
         # - Humans
-        s_h = N_h - i_h[i - 1] - r_h[i - 1]
-        new_infected_humans = min(N_h, beta_h * s_h * force_to_humans / N_h)
+        s_h = n_h - i_h[i - 1] - r_h[i - 1]
+        new_infected_humans = min(n_h, beta_h * s_h * force_to_humans / n_h)
         new_removed_humans = gamma_h * i_h[i - 1]
         new_recovered_humans = p_recovery_h * new_removed_humans
         new_dead_humans = new_removed_humans - new_recovered_humans
@@ -158,6 +162,7 @@ def plague_model(rat_pop=rat_pop, beta_h=beta_h, temp_scale=temp_scale, beta_r=b
             else:
                 pass
     return i_n, i_h, r_h, d_h, s_r, i_r, res_r, d_r, i_f, fph
+
 
 # Likelihood
 sim_data = pm.Lambda('sim_data', lambda plague_model=plague_model: plague_model[0])

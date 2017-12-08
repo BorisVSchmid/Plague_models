@@ -1,15 +1,14 @@
-from tools.TempReader import TempReader
-import os
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
+
+from tools.TempReader import TempReader
 
 
-class Model():
-
-    def __init__(self, dir, *args):
+class Model:
+    def __init__(self, directory, *args):
         # -- Params
-        self.dir = dir
+        self.dir = directory
         self.years_list = args[0][-2]
         self.months_list = args[0][-1]
         self.kappa = args[0][1].value
@@ -30,34 +29,35 @@ class Model():
         self.fph = np.zeros_like(self.t)
 
     def graph(self):
-        confirmed_cases = [0, 8, 12, 62, 16, 2, 14, 6, 5, 0, 0, 0, 0, 1, 5, 22, 39, 11, 8, 5, 6, 2, 1, 0, 0, 10, 38, 59,
+        confirmed_cases = [8, 12, 62, 16, 2, 14, 6, 5, 0, 0, 0, 0, 1, 5, 22, 39, 11, 8, 5, 6, 2, 1, 0, 0, 10, 38, 59,
                            74,
                            13, 6, 1, 1, 0, 0, 0, 0, 4, 17, 18, 29, 9, 8, 3, 3, 1, 0, 1, 0]
-        scaled_cases = [0.0, 52.0, 78.0, 403.0, 104.0, 13.0, 91.0, 36.0, 30.0, 0.0, 0.0, 0.0, 0.0, 6.0, 30.0, 132.0,
+        scaled_cases = [52.0, 78.0, 403.0, 104.0, 13.0, 91.0, 36.0, 30.0, 0.0, 0.0, 0.0, 0.0, 6.0, 30.0, 132.0,
                         234.0,
                         66.0, 48.0, 15.0, 18.0, 6.0, 3.0, 0.0, 0.0, 30.0, 114.0, 177.0, 222.0, 39.0, 18.0, 3.0, 3.0,
                         0.0,
                         0.0, 0.0, 0.0, 12.0, 51.0, 54.0, 87.0, 27.0, 24.0, 24.0, 24.0, 8.0, 0.0, 8.0, 0.0]
-        self.plot({"infected humans": self.i_h, "Conf. lab cases": confirmed_cases, "Scaled cases": scaled_cases})
-        self.plot({"susceptible rats": self.s_r, "infected rats": self.i_r, "resistant rats": self.res_r})
+        self.plot("infected_humans", "graph of infected humans with\n max posteriori values",
+                  infected_humans=self.i_h, confirmed_cases=confirmed_cases, scaled_cases=scaled_cases)
+        self.plot("infected_rats", "graph of infected rats with\n max posteriori values",
+                  susceptible_rats=self.s_r, infected_rats=self.i_r, resistant_rats=self.res_r)
 
-    def plot(self, **kwargs):
-        title = "Plague model"
+    def plot(self, filename, title, **kwargs):
         years = mdates.YearLocator()  # every year
         months = mdates.MonthLocator()  # every month
-        yearsFmt = mdates.DateFormatter('%Y')
+        years_fmt = mdates.DateFormatter('%Y')
         fig, ax = plt.subplots()
 
         # plot the data
         for label, data in kwargs.items():
             if len(data) == len(self.years_list):
-                ax.plot(self.years_list, data, label=label)
+                ax.plot(self.years_list, data, label=" ".join(label.split("_")))
             else:
-                ax.plot(self.months_list, data, label=label)
+                ax.plot(self.months_list, data, label=" ".join(label.split("_")))
 
         # format the ticks
         ax.xaxis.set_major_locator(years)
-        ax.xaxis.set_major_formatter(yearsFmt)
+        ax.xaxis.set_major_formatter(years_fmt)
         ax.xaxis.set_minor_locator(months)
 
         # set the axis limit
@@ -80,14 +80,13 @@ class Model():
         # some extra plot formating
         ax.legend(loc='best')
         plt.style.use('ggplot')
-        plt.rc('font', size=16)
+        plt.rc('font', size=12)
         plt.rc('lines', linewidth=2)
         plt.rc('figure', autolayout=True)
         plt.title(title)
         plt.xlabel('time in months')
         plt.ylabel('number of humans')
-        plt.show()
-        plt.close()
+        plt.savefig(filename + ".png")
 
     def plague_model(self):
         # - human
@@ -106,7 +105,7 @@ class Model():
         g_rate = .0084
         c_cap = 11.
         # human
-        N_h = 25000
+        n_h = 25000
         self.d_h[0] = 1.
         self.i_h[0] = 0.
         # rat
@@ -171,13 +170,14 @@ class Model():
             # time step values
             self.s_r[i] = min(self.kappa, self.s_r[i - 1] + unresistant_born_rats - new_infected_rats
                               - natural_death_unresistant - shrew_transference)
-            self.i_r[i] = self.i_r[i - 1] + new_infected_rats - new_removed_rats - natural_death_infected + shrew_transference
+            self.i_r[i] = self.i_r[i - 1] + new_infected_rats - new_removed_rats - natural_death_infected\
+                + shrew_transference
             self.res_r[i] = self.res_r[i - 1] + new_recovered_rats + resistant_born_rats - natural_death_resistant
             self.d_r[i] = new_dead_rats + natural_death_unresistant + natural_death_resistant + natural_death_infected
 
             # - Humans
-            s_h = N_h - self.i_h[i - 1] - self.r_h[i - 1]
-            new_infected_humans = min(N_h, self.beta * s_h * force_to_humans / N_h)
+            s_h = n_h - self.i_h[i - 1] - self.r_h[i - 1]
+            new_infected_humans = min(n_h, self.beta * s_h * force_to_humans / n_h)
             new_removed_humans = gamma_h * self.i_h[i - 1]
             new_recovered_humans = p_recovery_h * new_removed_humans
             new_dead_humans = new_removed_humans - new_recovered_humans

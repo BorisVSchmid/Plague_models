@@ -7,14 +7,22 @@ import os
 import os.path as op
 import matplotlib.dates as mdates
 from tools.run_manual import Model
+from tools.model_timing import Timing
 
 
-class Analyze():
+class Analyze:
 
-    def __init__(self, run=None):
+    def __init__(self, run=None, timing=None, itrs=1000, burn=500, thin=10, project=100000, verbose=0):
+        self.timing = timing
+        self.verbose = verbose
+        self.iter = itrs
+        self.burn = burn
+        self.thin = thin
+        self.project = project
         self.run = run
-        self.vars = [confirmed_cases, rat_pop, beta_h, gamma_h, p_recovery_h, temp_scale, beta_r, gamma_r, p_recovery_ur, rep_rate_r,
-                     rep_rate_ur, inh_res, d_rate_ui, d_rate, g_rate, c_cap, sim_data, mortality, mortalitysim, years_list,
+        self.vars = [confirmed_cases, rat_pop, beta_h, gamma_h, p_recovery_h, temp_scale, beta_r, gamma_r,
+                     p_recovery_ur, rep_rate_r, rep_rate_ur, inh_res, d_rate_ui, d_rate, g_rate, c_cap, sim_data,
+                     mortality, mortalitysim, years_list,
                      months_list]
         self.dir = None
         self.mc = None
@@ -42,7 +50,10 @@ class Analyze():
         os.chdir(self.dir)
         self.mc = pm.MCMC(self.vars, db='pickle', dbname=self.dir.split("\\")[-1] + ".pickle")
         self.mc.use_step_method(pm.AdaptiveMetropolis, [rat_pop, beta_h, temp_scale, beta_r, inh_res])
-        self.mc.sample(iter=400000, burn=200000, thin=10, verbose=1)
+        timing.sample()
+        self.mc.sample(iter=self.iter, burn=self.burn, thin=self.thin, verbose=self.verbose)
+        if timing and self.project > self.iter:
+            print(timing.project(self.iter, self.project))
         # self.mc.summary()
         self.remove_string_instances()
         self.plot()
@@ -59,15 +70,15 @@ class Analyze():
         man.graph()
 
     def plot(self):
-        M = pm.MAP(self.mc)
-        M.fit(tol=.01)
+        mc_map = pm.MAP(self.mc)
+        mc_map.fit(tol=.01)
         # iterlim = 250,
-        M.BIC
+        print(mc_map.BIC)
         plot(self.mc)
         # set years and months
         years = mdates.YearLocator()  # every year
         months = mdates.MonthLocator()  # every month
-        yearsFmt = mdates.DateFormatter('%Y')
+        years_fmt = mdates.DateFormatter('%Y')
         fig, ax = plt.subplots()
         # plot the data
         ax.plot(months_list, confirmed_cases, 'o', mec='black', color='black', label='confirmed cases')
@@ -77,12 +88,13 @@ class Analyze():
         ax.fill_between(months_list, y_min, y_max, color='r', alpha=0.3, label='BPL (95% CI)')
         # format the ticks
         ax.xaxis.set_major_locator(years)
-        ax.xaxis.set_major_formatter(yearsFmt)
+        ax.xaxis.set_major_formatter(years_fmt)
         ax.xaxis.set_minor_locator(months)
         # set the axis limit
         datemin = min(months_list) - 1
         datemax = max(months_list) + 1
         ax.set_xlim(datemin, datemax)
+
         # format the coords message box
         def price(x):
             return '$%1.2f' % x
@@ -105,6 +117,9 @@ class Analyze():
 
 
 if __name__ == "__main__":
-    # run = "run5"
-    # Analyze(run).re_run()
-    Analyze().new_run()
+    timing = Timing()
+    run = "run30"
+    Analyze(run).re_run()
+    # Analyze(iter=1000000, burn=500000).new_run()
+    # timing.stop()
+    # print(timing)
