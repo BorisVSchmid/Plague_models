@@ -11,32 +11,26 @@ class Model:
         self.dir = directory
         self.years_list = args[0][-2]
         self.months_list = args[0][-1]
-        self.kappa = args[0][1].value
-        self.beta = args[0][2].value
-        self.phi = args[0][5].value
-        self.rho = args[0][6].value
-        self.iota = args[0][11].value
+        self.rat_pop = args[0][1].value
+        self.beta_h = args[0][2].value
+        self.temp_scale = args[0][5].value
+        self.beta_r = args[0][6].value
+        self.inh_res = args[0][11].value
         self.data, self.temp_list = TempReader().cooked()
         self.t = [x for x in range(0, len(self.years_list))]
-        self.i_h = np.zeros_like(self.t)
-        self.r_h = np.zeros_like(self.t)
-        self.d_h = np.zeros_like(self.t)
-        self.s_r = np.zeros_like(self.t)
-        self.i_r = np.zeros_like(self.t)
-        self.res_r = np.zeros_like(self.t)
-        self.d_r = np.zeros_like(self.t)
-        self.i_f = np.zeros_like(self.t)
-        self.fph = np.zeros_like(self.t)
+        self.i_h = np.zeros_like(self.t, dtype=float)
+        self.r_h = np.zeros_like(self.t, dtype=float)
+        self.s_r = np.zeros_like(self.t, dtype=float)
+        self.i_r = np.zeros_like(self.t, dtype=float)
+        self.res_r = np.zeros_like(self.t, dtype=float)
+        self.d_r = np.zeros_like(self.t, dtype=float)
+        self.i_f = np.zeros_like(self.t, dtype=float)
+        self.fph = np.zeros_like(self.t, dtype=float)
 
     def graph(self):
-        confirmed_cases = [8, 12, 62, 16, 2, 14, 6, 5, 0, 0, 0, 0, 1, 5, 22, 39, 11, 8, 5, 6, 2, 1, 0, 0, 10, 38, 59,
-                           74,
-                           13, 6, 1, 1, 0, 0, 0, 0, 4, 17, 18, 29, 9, 8, 3, 3, 1, 0, 1, 0]
-        scaled_cases = [52.0, 78.0, 403.0, 104.0, 13.0, 91.0, 36.0, 30.0, 0.0, 0.0, 0.0, 0.0, 6.0, 30.0, 132.0,
-                        234.0,
-                        66.0, 48.0, 15.0, 18.0, 6.0, 3.0, 0.0, 0.0, 30.0, 114.0, 177.0, 222.0, 39.0, 18.0, 3.0, 3.0,
-                        0.0,
-                        0.0, 0.0, 0.0, 12.0, 51.0, 54.0, 87.0, 27.0, 24.0, 24.0, 24.0, 8.0, 0.0, 8.0, 0.0]
+        confirmed_cases = [0, 0, 0, 0, 0, 0, 8, 12, 62, 16, 2, 14, 6, 5, 0, 0, 0, 0, 1, 5, 22, 39, 11, 8, 5, 6, 2, 1, 0, 0, 10, 38, 59,
+                           74, 13, 6, 1, 1, 0, 0, 0, 0, 4, 17, 18, 29, 9, 8, 3, 3, 1, 0, 1, 0]
+        scaled_cases = [0, 0, 0, 0, 0, 0, 52.0, 78.0, 403.0, 104.0, 13.0, 91.0, 36.0, 30.0, 0.0, 0.0, 0.0, 0.0, 6.0, 30.0, 132.0, 234.0, 66.0, 48.0, 15.0, 18.0, 6.0, 3.0, 0.0, 0.0, 30.0, 114.0, 177.0, 222.0, 39.0, 18.0, 3.0, 3.0, 0.0, 0.0, 0.0, 0.0, 12.0, 51.0, 54.0, 87.0, 27.0, 24.0, 24.0, 24.0, 8.0, 0.0, 8.0, 0.0]
         self.plot("infected_humans", "graph of infected humans with\n max posteriori values",
                   infected_humans=self.i_h, confirmed_cases=confirmed_cases, scaled_cases=scaled_cases)
         self.plot("infected_rats", "graph of infected rats with\n max posteriori values",
@@ -103,27 +97,29 @@ class Model:
         d_rate = 0.2
         # 0.2
         g_rate = .0084
-        c_cap = 11.
+        c_cap = 6.
         # human
         n_h = 25000
-        self.d_h[0] = 1.
         self.i_h[0] = 0.
         # rat
-        self.s_r[0] = self.kappa - 20.
+        self.s_r[0] = self.rat_pop - 20.
         self.res_r[0] = 0.
+        infected_rat_deaths = 0.0
         # flea
-        searching = 3. / (self.s_r[0])
+        n_d_rate = 0.005
+        searching = 3. / self.s_r[0]
         self.fph[0] = 6.0
         # shrews
-        i_rpd = 2.
+        i_rpd = 0.00167
         for i, v in enumerate(self.years_list[1:], 1):
             if 189 <= v.timetuple().tm_yday <= 222:
-                shrew_transference = i_rpd
+                shrew_transference = i_rpd * self.s_r[i - 1]
             else:
                 shrew_transference = 0
             date_string = v.strftime("%Y-%m-%d")
-            temp = self.data[date_string][0] * self.phi
-            temp_fac = (temp - 15) / 10
+            temp = self.data[date_string][0] * self.temp_scale
+            temp_growth_factor = max(0, (temp - 15.0) / 10.0)
+            temp_spread_factor = (0.75 - 0.25 * np.tanh(((temp * 9. / 5.) + 32.) - 80.))
             # + rec_r[i - 1]
             n_r = self.s_r[i - 1] + self.i_r[i - 1] + self.res_r[i - 1]
             # natural deaths
@@ -131,15 +127,6 @@ class Model:
             natural_death_resistant = (self.res_r[i - 1] * d_rate_ui)
             natural_death_infected = (self.i_r[i - 1] * d_rate_ui)
             # - Fleas
-            if i == 1:
-                infected_rat_deaths = self.d_h[0]
-            if self.fph[i - 1] / c_cap < 1.:
-                flea_growth = (g_rate * temp_fac) * (self.fph[i - 1] * (1. - (self.fph[i - 1] / c_cap)))
-            elif self.fph[i - 1] / c_cap > 1.:
-                flea_growth = -(g_rate * temp_fac) * (self.fph[i - 1] * (1. - (self.fph[i - 1] / c_cap)))
-            else:
-                flea_growth = 0.
-
             new_infectious = infected_rat_deaths * self.fph[i - 1]
             # could be made temperature dependent
             starvation_deaths = d_rate * self.i_f[i - 1]
@@ -147,14 +134,15 @@ class Model:
             force_to_humans = min(self.i_f[i - 1], self.i_f[i - 1] * np.exp(float(-searching * n_r)))
             # number of fleas that find a rat
             force_to_rats = self.i_f[i - 1] - force_to_humans
-            force_to_rats = force_to_rats * (0.75 - 0.25 * np.tanh(((temp * 9 / 5) + 32) - 80))
-            force_to_humans = force_to_humans * 0.9 * (0.75 - 0.25 * np.tanh(((temp * 9 / 5) + 32) - 80))
-            self.fph[i] = self.fph[i - 1] + flea_growth
+            force_to_rats = force_to_rats * temp_spread_factor
+            force_to_humans = force_to_humans * temp_spread_factor
+            self.fph[i] = self.fph[i - 1] + (temp_growth_factor * g_rate * self.fph[i - 1])\
+                          - (n_d_rate * (1 + self.fph[i - 1] / c_cap) * self.fph[i - 1])
             # should add dehydration
             self.i_f[i] = max(0.0, self.i_f[i - 1] + new_infectious - starvation_deaths)
 
             # - Rats
-            new_infected_rats = self.rho * self.s_r[i - 1] * force_to_rats / n_r
+            new_infected_rats = self.beta_r * self.s_r[i - 1] * force_to_rats / n_r
             new_infected_rats = 0 if new_infected_rats < 0 else new_infected_rats
             new_removed_rats = gamma_r * (self.i_r[i - 1] - natural_death_infected)
             new_recovered_rats = p_recovery_ur * new_removed_rats
@@ -162,13 +150,13 @@ class Model:
             infected_rat_deaths = new_dead_rats
 
             # born rats
-            pressure = n_r / self.kappa
-            resistant_born_rats = rep_rate_r * self.res_r[i - 1] * (self.iota - pressure)
-            unresistant_born_rats = ((rep_rate_r * self.res_r[i - 1] * (1 - self.iota))
+            pressure = n_r / self.rat_pop
+            resistant_born_rats = rep_rate_r * self.res_r[i - 1] * (self.inh_res - pressure)
+            unresistant_born_rats = ((rep_rate_r * self.res_r[i - 1] * (1 - self.inh_res))
                                      + (rep_rate_ur * self.s_r[i - 1] * (1 - pressure)))
 
             # time step values
-            self.s_r[i] = min(self.kappa, self.s_r[i - 1] + unresistant_born_rats - new_infected_rats
+            self.s_r[i] = min(self.rat_pop, self.s_r[i - 1] + unresistant_born_rats - new_infected_rats
                               - natural_death_unresistant - shrew_transference)
             self.i_r[i] = self.i_r[i - 1] + new_infected_rats - new_removed_rats - natural_death_infected\
                 + shrew_transference
@@ -177,12 +165,10 @@ class Model:
 
             # - Humans
             s_h = n_h - self.i_h[i - 1] - self.r_h[i - 1]
-            new_infected_humans = min(n_h, self.beta * s_h * force_to_humans / n_h)
+            new_infected_humans = min(n_h, self.beta_h * s_h * force_to_humans / n_h) + 0.000000000001
             new_removed_humans = gamma_h * self.i_h[i - 1]
             new_recovered_humans = p_recovery_h * new_removed_humans
-            new_dead_humans = new_removed_humans - new_recovered_humans
 
             # time step values
-            self.i_h[i] = self.i_h[i - 1] + new_infected_humans - new_removed_humans + 0.0000001
+            self.i_h[i] = self.i_h[i - 1] + new_infected_humans - new_removed_humans
             self.r_h[i] = self.r_h[i - 1] + new_recovered_humans
-            self.d_h[i] = new_dead_humans + 0.0000001

@@ -27,11 +27,16 @@ class Analyze:
         self.dir = None
         self.mc = None
 
-    def re_run(self):
+    def re_run(self, itrs=None, burn=None, thin=None, cont=False):
         self.dir = op.join(op.dirname(op.abspath(__file__)), 'runs', self.run)
         os.chdir(self.dir)
         db = pm.database.pickle.load(self.run + '.pickle')
         self.mc = pm.MCMC(self.vars, db=db)
+        if cont:
+            self.iter = itrs if itrs else self.iter
+            self.burn = burn if burn else self.burn
+            self.thin = thin if thin else self.thin
+            self.mc.sample(iter=self.iter, burn=self.burn, thin=self.thin, verbose=self.verbose)
         self.remove_string_instances()
         self.plot()
         self.run_manual()
@@ -73,7 +78,7 @@ class Analyze:
         mc_map = pm.MAP(self.mc)
         mc_map.fit(tol=.01)
         # iterlim = 250,
-        print(mc_map.BIC)
+        print("BIC score: {}".format(mc_map.BIC))
         plot(self.mc)
         # set years and months
         years = mdates.YearLocator()  # every year
@@ -118,8 +123,8 @@ class Analyze:
 
 if __name__ == "__main__":
     timing = Timing()
-    run = "run30"
-    Analyze(run).re_run()
-    # Analyze(iter=1000000, burn=500000).new_run()
-    # timing.stop()
-    # print(timing)
+    run = "run44"
+    Analyze(run).re_run(itrs=1000000, burn=500000, cont=True)
+    # Analyze(itrs=100000, burn=50000).new_run()
+    timing.stop()
+    print(timing)

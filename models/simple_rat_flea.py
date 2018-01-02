@@ -23,30 +23,29 @@ def day_of_year(x):
     return x.timetuple().tm_yday
 
 
-def run(n_h, beta_h, rat_pop, beta_r, i_rpd, inh_res, years_list, months_list, shrew_pop, temp_scale):
-    confirmed_cases = [0, 8, 12, 62, 16, 2, 14, 6, 5, 0, 0, 0, 0, 1, 5, 22, 39, 11, 8, 5, 6, 2, 1, 0, 0, 10, 38, 59, 74,
-                       13, 6, 1, 1, 0, 0, 0, 0, 4, 17, 18, 29, 9, 8, 3, 3, 1, 0, 1, 0]
-    scaled_cases = [0.0, 52.0, 78.0, 403.0, 104.0, 13.0, 91.0, 36.0, 30.0, 0.0, 0.0, 0.0, 0.0, 6.0, 30.0, 132.0, 234.0,
-                    66.0, 48.0, 15.0, 18.0, 6.0, 3.0, 0.0, 0.0, 30.0, 114.0, 177.0, 222.0, 39.0, 18.0, 3.0, 3.0, 0.0,
-                    0.0, 0.0, 0.0, 12.0, 51.0, 54.0, 87.0, 27.0, 24.0, 24.0, 24.0, 8.0, 0.0, 8.0, 0.0]
+def run(n_h, beta_h, rat_pop, beta_r, inh_res, years_list, months_list, shrew_pop, temp_scale):
+    confirmed_cases = [0, 0, 0, 0, 0, 0, 8, 12, 62, 16, 2, 14, 6, 5, 0, 0, 0, 0, 1, 5, 22, 39, 11, 8, 5, 6, 2, 1, 0, 0,
+                       10, 38, 59, 74, 13, 6, 1, 1, 0, 0, 0, 0, 4, 17, 18, 29, 9, 8, 3, 3, 1, 0, 1, 0]
+    scaled_cases = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 52.0, 78.0, 403.0, 104.0, 13.0, 91.0, 36.0, 30.0, 0.0, 0.0, 0.0, 0.0,
+                    6.0, 30.0, 132.0, 234.0, 66.0, 48.0, 15.0, 18.0, 6.0, 3.0, 0.0, 0.0, 30.0, 114.0, 177.0, 222.0,
+                    39.0, 18.0, 3.0, 3.0, 0.0, 0.0, 0.0, 0.0, 12.0, 51.0, 54.0, 87.0, 27.0, 24.0, 24.0, 24.0, 8.0, 0.0,
+                    8.0, 0.0]
     # -- Params
     data, temp_list = TempReader().cooked()
     t = [x for x in range(0, len(years_list))]
     # - Human
-    i_h = np.zeros_like(t)
-    r_h = np.zeros_like(t)
-    d_h = np.zeros_like(t, dtype=float)
-    d_h[0] = 2.0
+    i_h = np.zeros_like(t, dtype=float)
+    r_h = np.zeros_like(t, dtype=float)
     i_h[0] = 1.0
     gamma_h = 0.1
     p_recovery_h = .4
     # - rat
-    s_r = np.zeros_like(t)
-    i_r = np.zeros_like(t)
+    s_r = np.zeros_like(t, dtype=float)
+    i_r = np.zeros_like(t, dtype=float)
     i_r[0] = 0
     # rec_r = np.zeros_like(t)
-    res_r = np.zeros_like(t)
-    d_r = np.zeros_like(t)
+    res_r = np.zeros_like(t, dtype=float)
+    d_r = np.zeros_like(t, dtype=float)
     s_r[0] = rat_pop
     beta_r = beta_r
     gamma_r = 0.2
@@ -55,21 +54,25 @@ def run(n_h, beta_h, rat_pop, beta_r, i_rpd, inh_res, years_list, months_list, s
     rep_rate_ur = .4
     inh_res = inh_res
     d_rate_ui = 1. / 365.
+    infected_rat_deaths = 0.0
     # - flea
     d_rate = 0.2
     n_d_rate = 0.005
     g_rate = .0084
     c_cap = 6.
-    i_f = np.zeros_like(t)
-    fph = np.zeros_like(t)
+    i_f = np.zeros_like(t, dtype=float)
+    fph = np.zeros_like(t, dtype=float)
     fph[0] = c_cap
     searching = 3. / (s_r[0] + res_r[0])
     # shrews
+    i_rpd = 0.001
+    # debuging array
+    my_values = np.zeros_like(t, dtype=float)
     # -- Simulate
     for i, v in enumerate(years_list[1:], 1):
         # shrews
-        if p_t(day_of_year(v), shrew_pop) >= 1:
-            shrew_transference = i_rpd
+        if 189 <= v.timetuple().tm_yday <= 222:
+            shrew_transference = i_rpd * s_r[i - 1]
         else:
             shrew_transference = 0
         # temperature data and factor calculations
@@ -80,14 +83,6 @@ def run(n_h, beta_h, rat_pop, beta_r, i_rpd, inh_res, years_list, months_list, s
         # the total amount of rats
         n_r = s_r[i - 1] + i_r[i - 1] + res_r[i - 1]
         # - Fleas
-        if i == 1:
-            infected_rat_deaths = d_h[0]
-        if fph[i - 1] / c_cap < 1.:
-            flea_growth = (g_rate * temp_growth_factor) * (fph[i - 1] * (1. - (fph[i - 1] / c_cap)))
-        elif fph[i - 1] / c_cap > 1.:
-            flea_growth = -(g_rate * temp_growth_factor) * (fph[i - 1] * (1. - (fph[i - 1] / c_cap)))
-        else:
-            flea_growth = 0.
         new_infectious = infected_rat_deaths * fph[i - 1]
         starvation_deaths = d_rate * i_f[i - 1]
         # number of fleas that find a human
@@ -96,7 +91,7 @@ def run(n_h, beta_h, rat_pop, beta_r, i_rpd, inh_res, years_list, months_list, s
         force_to_rats = i_f[i - 1] - force_to_humans
         force_to_rats = force_to_rats * temp_spread_factor
         force_to_humans = force_to_humans * temp_spread_factor
-        fph[i] = fph[i - 1] + flea_growth
+        fph[i] = fph[i - 1] + (temp_growth_factor * g_rate * fph[i - 1]) - (n_d_rate * (1 + fph[i - 1]/c_cap) * fph[i - 1])
         # should add dehydration
         i_f[i] = i_f[i - 1] + new_infectious - starvation_deaths
 
@@ -130,13 +125,13 @@ def run(n_h, beta_h, rat_pop, beta_r, i_rpd, inh_res, years_list, months_list, s
         # time step values
         i_h[i] = i_h[i - 1] + new_infected_humans - new_removed_humans
         r_h[i] = r_h[i - 1] + new_recovered_humans
-        d_h[i] = new_dead_humans + 0.0000001
     graphs = [[months_list, years_list, {"infected humans": i_h.tolist(),
                                          "Conf. lab cases": confirmed_cases,
                                          "Scaled cases": scaled_cases}],
               [months_list, years_list, {"susceptible rats": s_r.tolist(),
                                          "infected rats": i_r.tolist(),
-                                         "resistant rats": res_r.tolist()}]]
+                                         "resistant rats": res_r.tolist()}]
+              ]
     jobs = []
     for g in graphs:
         p = mp.Process(target=plot, args=g)
@@ -196,11 +191,11 @@ def plot(months_list, years_list, kwargs):
 
 
 if __name__ == "__main__":
-    start = [1995, 6, 1]
+    start = [1995, 1, 1]
     end = [1999, 7, 1]
     months_list = pd.date_range(datetime.date(start[0], start[1], start[2]), datetime.date(end[0], end[1], end[2]),
                                 freq='M').tolist()
     years_list = pd.date_range(datetime.date(start[0], start[1], start[2]),
                                datetime.date(end[0], end[1], end[2])).tolist()
-    run(20000., .15, 8000.0, .15, 2.0, 0.975, years_list, months_list, 12000., 1.085)
+    run(25000., .21, 2000.0, .1, 0.966, years_list, months_list, 12000., 0.95)
     # run(N_h, beta_h, rat_pop, beta_r, i_rpd, inh_res)
