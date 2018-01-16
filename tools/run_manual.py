@@ -12,7 +12,7 @@ class Model:
         self.years_list = args[0][-2]
         self.months_list = args[0][-1]
         self.rat_pop = args[0][1].value
-        self.beta_h = args[0][2].value
+        self.beta_h = 0.225
         self.temp_scale = args[0][5].value
         self.beta_r = args[0][6].value
         self.inh_res = args[0][11].value

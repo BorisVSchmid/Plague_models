@@ -12,7 +12,11 @@ __all__ = ['confirmed_cases', 'rat_pop', 'beta_h', 'gamma_h', 'p_recovery_h', 't
 start = [1995, 1, 1]
 end = [1999, 7, 1]
 # confirmed_cases = [52.0, 78.0, 403.0, 104.0, 13.0, 91.0]
-confirmed_cases = np.array([0.0, 0.0, 0.0, None, 13.0, None, 52.0, 78.0, 403.0, 104.0, 13.0, 91.0, 36.0, 30.0, 0.0, 0.0,
+# confirmed_cases = np.array([0.0, 0.0, 0.0, None, 13.0, None, 52.0, 78.0, 403.0, 104.0, 13.0, 91.0, 36.0, 30.0, 0.0, 0.0,
+#                             0.0, 0.0, 6.0, 30.0, 132.0, 234.0, 66.0, 48.0, 15.0, 18.0, 6.0, 3.0, 0.0, 0.0, 30.0, 114.0,
+#                             177.0, 222.0, 39.0, 18.0, 3.0, 3.0, 0.0, 0.0, 0.0, 0.0, 12.0, 51.0, 54.0, 87.0, 27.0, 24.0,
+#                             24.0, 24.0, 8.0, 0.0, 8.0, 0.0])
+confirmed_cases = np.array([0.0, 0.0, 0.0, None, 13.0, None, 52.0, 78.0, 403.0, 104.0, None, 91.0, 36.0, 30.0, 0.0, 0.0,
                             0.0, 0.0, 6.0, 30.0, 132.0, 234.0, 66.0, 48.0, 15.0, 18.0, 6.0, 3.0, 0.0, 0.0, 30.0, 114.0,
                             177.0, 222.0, 39.0, 18.0, 3.0, 3.0, 0.0, 0.0, 0.0, 0.0, 12.0, 51.0, 54.0, 87.0, 27.0, 24.0,
                             24.0, 24.0, 8.0, 0.0, 8.0, 0.0])
@@ -30,23 +34,23 @@ months_list = pd.date_range(date(start[0], start[1], start[2]), date(end[0], end
 data, temp_list = TempReader().cooked()
 t = len(data)
 # - human
-rat_pop = pm.Uniform('rat_pop', 21, 15000.0, value=1050.0)
-beta_h = pm.Uniform('beta_h', 1e-9, 0.6, value=0.21)
+rat_pop = pm.Uniform('rat_pop', 21,6000, value=1500.0)
+beta_h = 0.225
 # .2
 gamma_h = 0.2
 p_recovery_h = .4
 # - rat
 # .08
-temp_scale = pm.Uniform('temp_scale', 0.75, 1.25, value=0.95)
+temp_scale = pm.Uniform('temp_scale', 0.9, 1.1, value=0.9445)
 # 0.08
-beta_r = pm.Uniform('beta_r', 1e-9, .99, value=0.069)
+beta_r = pm.Uniform('beta_r', 0.050, .1, value=0.068)
 # .2
 gamma_r = 0.2
 # .1
 p_recovery_ur = .1
 rep_rate_r = .4 * (1 - 0.234)
 rep_rate_ur = .4
-inh_res = pm.Uniform('inh_res', 0.2, 0.99, value=0.966)
+inh_res = pm.Uniform('inh_res', 0.8, 0.98, value=0.975)
 d_rate_ui = 1. / 365.
 # - flea
 d_rate = 0.2
@@ -108,7 +112,6 @@ def plague_model(rat_pop=rat_pop, beta_h=beta_h, temp_scale=temp_scale, beta_r=b
         force_to_rats = force_to_rats * temp_spread_factor
         force_to_humans = force_to_humans * temp_spread_factor
         fph[i] = fph[i - 1] + (temp_growth_factor * g_rate * fph[i - 1]) - (n_d_rate * (1 + fph[i - 1]/c_cap) * fph[i - 1])
-        # should add dehydration
         i_f[i] = max(0.0, i_f[i - 1] + new_infectious - starvation_deaths)
 
         # - Rats

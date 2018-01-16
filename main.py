@@ -8,11 +8,12 @@ import os.path as op
 import matplotlib.dates as mdates
 from tools.run_manual import Model
 from tools.model_timing import Timing
+from shutil import copy2
 
 
 class Analyze:
 
-    def __init__(self, run=None, timing=None, itrs=1000, burn=500, thin=10, project=100000, verbose=0):
+    def __init__(self, run=None, timing=False, itrs=1000, burn=500, thin=10, project=100000, verbose=0):
         self.timing = timing
         self.verbose = verbose
         self.iter = itrs
@@ -28,7 +29,7 @@ class Analyze:
         self.mc = None
 
     def re_run(self, itrs=None, burn=None, thin=None, cont=False):
-        self.dir = op.join(op.dirname(op.abspath(__file__)), 'runs', self.run)
+        self.dir = op.join(op.dirname(op.dirname(op.dirname(op.abspath(__file__)))), 'OneDrive', 'Stage', 'runs', self.run)
         os.chdir(self.dir)
         db = pm.database.pickle.load(self.run + '.pickle')
         self.mc = pm.MCMC(self.vars, db=db)
@@ -43,25 +44,32 @@ class Analyze:
 
     def new_run(self):
         """returns a new directory to store the current run to."""
-        self.dir = op.join(op.dirname(op.abspath(__file__)), 'runs')
+        self.dir = op.join(op.dirname(op.dirname(op.dirname(op.abspath(__file__)))), 'OneDrive', 'Stage', 'runs')
         dirs = os.listdir(self.dir)
         if len(dirs):
             l_run = max([int(x[3:]) for x in dirs])
             self.dir = op.join(self.dir, 'run' + str(l_run + 1))
+            self.run = l_run + 1
         else:
             self.dir = op.join(self.dir, 'run' + str(1))
+            self.run = 1
         if not op.exists(self.dir):
             os.makedirs(self.dir)
         os.chdir(self.dir)
         self.mc = pm.MCMC(self.vars, db='pickle', dbname=self.dir.split("\\")[-1] + ".pickle")
-        self.mc.use_step_method(pm.AdaptiveMetropolis, [rat_pop, beta_h, temp_scale, beta_r, inh_res])
+        self.mc.use_step_method(pm.AdaptiveMetropolis, [rat_pop, temp_scale, beta_r, inh_res])
         timing.sample()
         self.mc.sample(iter=self.iter, burn=self.burn, thin=self.thin, verbose=self.verbose)
         if timing and self.project > self.iter:
+            print(timing.project(self.iter, self.iter))
             print(timing.project(self.iter, self.project))
         # self.mc.summary()
         self.remove_string_instances()
+        timing.sample()
         self.plot()
+        if timing and self.project > self.iter:
+            print(timing.project(self.iter, self.iter))
+            print(timing.project(self.iter, self.project))
         self.run_manual()
 
     def remove_string_instances(self):
@@ -73,6 +81,7 @@ class Analyze:
         man = Model(self.dir, self.vars)
         man.plague_model()
         man.graph()
+        copy2(op.join(op.dirname(op.abspath(__file__)), 'models', 'rat_flea_pymc.py'), op.join(self.dir, 'code' + str(self.run) + '.txt'))
 
     def plot(self):
         mc_map = pm.MAP(self.mc)
@@ -87,7 +96,7 @@ class Analyze:
         fig, ax = plt.subplots()
         # plot the data
         ax.plot(months_list, confirmed_cases, 'o', mec='black', color='black', label='confirmed cases')
-        ax.plot(months_list, mortalitysim.stats()['mean'], color='red', linewidth=1, label='BPL (mean)')
+        ax.plot(months_list, mortalitysim.stats()['mean'], color='red', linewidth=1, label='MIH (mean)')
         y_min = mortalitysim.stats()['quantiles'][2.5]
         y_max = mortalitysim.stats()['quantiles'][97.5]
         ax.fill_between(months_list, y_min, y_max, color='r', alpha=0.3, label='BPL (95% CI)')
@@ -123,8 +132,9 @@ class Analyze:
 
 if __name__ == "__main__":
     timing = Timing()
-    run = "run44"
-    Analyze(run).re_run(itrs=1000000, burn=500000, cont=True)
-    # Analyze(itrs=100000, burn=50000).new_run()
+    print(timing.started())
+    # run = "run44"
+    # Analyze(run).re_run(itrs=1000000, burn=500000, cont=True)
+    Analyze(itrs=2000000, burn=1000000).new_run()
     timing.stop()
     print(timing)

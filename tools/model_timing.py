@@ -21,6 +21,9 @@ class Timing:
         self.hours = self.duration // 60 // 60 % 24
         self.days = self.duration // 60 // 60 // 24
 
+    def started(self):
+        return "---- started on {} ----\n".format(self.start_date.strftime("%H:%M %A %d %B %Y"))
+
     def sample(self):
         self.sample_start = time.time()
         
@@ -36,5 +39,4 @@ class Timing:
             .format(str(projected), self.time_str(((time.time() - self.sample_start) / iterations) * projected))
 
     def __str__(self):
-        return "---- started on {} ----\n".format(self.start_date.strftime("%H:%M %A %d %B %Y")) + \
-               "---- finished in {} ----".format(self.time_str(time.time() - self.start))
+        return "---- finished in {} ----".format(self.time_str(time.time() - self.start))
